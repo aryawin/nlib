@@ -1,360 +1,232 @@
-# Procedural Cave Generation Algorithm for Roblox
+# Simple Cave Generation for Roblox
 
-A comprehensive procedural cave generation system that fully utilizes the NoiseLib module's capabilities to generate complex, realistic cave systems in Roblox using `Terrain:WriteVoxels` for optimal performance.
+A streamlined cave generation system that creates beautiful, natural-looking cave systems without floating rocks or disconnected segments. Designed for immediate good results with minimal configuration.
 
-## 🌟 Features
+## 🌟 Key Features
 
-### Complete 5-Stage Algorithm
-1. **Abstract Data Generation** - Create 3D cave grid using NoiseLib at 4-stud resolution
-2. **Logical Structure Analysis** - Analyze networks, entrances, and water flow patterns
-3. **Terrain Voxel Preparation** - Prepare materials and occupancies arrays
-4. **Voxel Data Rendering** - Single `Terrain:WriteVoxels` call per chunk for optimal performance
-5. **Detailed Feature Placement** - Secondary pass for geological features using `FillBlock`/`FillBall`
-
-### Advanced Features
-- **Complete NoiseLib Integration** - Leverages all NoiseLib capabilities including:
-  - `generateRealisticCaves` for complex cave structures
-  - `analyzeCaveNetworks` for interconnected systems
-  - `generateCaveFeatures` for geological formations
-  - `simulateWaterFlow` for erosion patterns
-  - `findCaveEntrances` for surface openings
-- **Performance Optimized** - Chunk-based processing with memory management
-- **Comprehensive Feature Generation** - Stalactites, stalagmites, crystal formations, underground pools
-- **Water Flow Simulation** - Realistic erosion and water path calculation
-- **Debug Visualization** - Complete visualization tools for development
-- **Progress Reporting** - Real-time progress updates with GUI support
+- **Clean Cave Structures**: No floating rocks or disconnected segments
+- **Simple API**: Easy to use with good defaults that just work
+- **3D Density Field**: Creates naturally connected tunnels and chambers
+- **Multi-Scale Noise**: Combines different scales for realistic cave structures
+- **Connectivity Filtering**: Automatically removes isolated floating elements
+- **Optimized Performance**: Efficient chunk-based processing with `Terrain:WriteVoxels`
 
 ## 📁 File Structure
 
 ```
 nlib/
 ├── NoiseLib.lua                    # Core noise generation library
-├── ProceduralCaveGenerator.lua     # Main cave generation algorithm
-├── CaveGenerationExample.lua       # Usage examples and demonstrations
+├── ProceduralCaveGenerator.lua     # Simplified cave generation system
+├── CaveGenerationExample.lua       # Easy-to-use examples
 └── README.md                       # This documentation
 ```
 
 ## 🚀 Quick Start
 
-### Basic Usage
+### Basic Usage (Just Works!)
 
 ```lua
-local ProceduralCaveGenerator = require(script.ProceduralCaveGenerator)
+local CaveGenerator = require(script.ProceduralCaveGenerator)
 
--- Define generation area
-local region = Region3.new(Vector3.new(-128, -128, -128), Vector3.new(128, 0, 128))
+-- Create a test region
+local region = CaveGenerator.createTestRegion(Vector3.new(0, -64, 0), Vector3.new(128, 80, 128))
 
--- Configure cave settings
-local settings = {
-    region = region,
-    chunkSize = 64,
-    resolution = 4,
-    caveSettings = {
-        threshold = 0.4,
-        optimalDepth = -60,
-        depthRange = 40,
-        tunnelScale = 0.025,
-        chamberScale = 0.06,
-        connectivity = 0.8
-    },
-    generateFeatures = true,
-    generateWaterFlow = true,
-    generateEntrances = true
-}
-
--- Generate cave system
-local result = ProceduralCaveGenerator.generateCaveSystem(
-    workspace.Terrain, 
-    settings, 
-    function(progress, stage, details)
-        print(string.format("%s: %.1f%% - %s", stage, progress * 100, details))
-    end
-)
+-- Generate caves with good defaults
+local result = CaveGenerator.generateCaves(workspace.Terrain, region)
 
 if result.success then
-    print("✅ Generated", result.totalCaves, "caves with", result.totalFeatures, "features")
+    print("✅ Generated", result.cavesGenerated, "cave voxels!")
 else
-    warn("❌ Generation failed:", result.error)
+    warn("❌ Failed:", result.error)
 end
 ```
 
 ### Using Examples
 
 ```lua
-local CaveExample = require(script.CaveGenerationExample)
+local CaveExamples = require(script.CaveGenerationExample)
 
--- Generate a small test cave
-local result = CaveExample.generateSmallTestCave(workspace.Terrain, game.Players.LocalPlayer)
+-- Generate basic caves (recommended starting point)
+CaveExamples.generateBasicCaves(workspace.Terrain)
 
--- Generate a realistic cave network
-local result = CaveExample.generateRealisticNetwork(workspace.Terrain, game.Players.LocalPlayer)
+-- Try different styles
+CaveExamples.generateDenseCaves(workspace.Terrain)
+CaveExamples.generateBigCaverns(workspace.Terrain)
 
--- Generate lava caves
-local result = CaveExample.generateLavaCaves(workspace.Terrain, game.Players.LocalPlayer)
-
--- Performance optimized generation
-local result = CaveExample.generatePerformanceOptimized(workspace.Terrain, game.Players.LocalPlayer)
+-- Quick demo of all types
+CaveExamples.runDemo(workspace.Terrain)
 ```
 
 ## 🎛️ Configuration Options
 
-### Cave Generation Settings
+### Simple Settings
 
 ```lua
-type CaveGenerationSettings = {
-    -- Basic settings
-    region: Region3,           -- Generation area
-    chunkSize: number?,        -- Size of each chunk (default: 64)
-    resolution: number?,       -- Studs per voxel (default: 4)
+local settings = {
+    -- Cave density and structure
+    caveThreshold = 0.4,      -- How dense caves should be (0.3-0.6)
+    caveScale = 0.03,         -- Size of cave features (0.02-0.08)
+    tunnelScale = 0.025,      -- Scale for main tunnels (0.01-0.05)
+    chamberScale = 0.08,      -- Scale for large chambers (0.05-0.15)
     
-    -- NoiseLib settings
-    caveSettings: {
-        threshold: number?,         -- Cave air threshold (0.3-0.5)
-        optimalDepth: number?,      -- Preferred cave depth (-60)
-        depthRange: number?,        -- Depth variation range (40)
-        tunnelScale: number?,       -- Main tunnel noise scale (0.02)
-        chamberScale: number?,      -- Chamber noise scale (0.05)
-        connectivity: number?,      -- Network connectivity (0.7)
-        waterLevel: number?,        -- Water spawn level (-50)
-        lavaLevel: number?,         -- Lava spawn level (-150)
-        weightMainTunnels: number?, -- Tunnel weight (0.6)
-        weightChambers: number?,    -- Chamber weight (0.3)
-        weightVerticalShafts: number? -- Shaft weight (0.1)
-    },
+    -- Depth control
+    minDepth = -20,           -- Minimum depth for caves
+    maxDepth = -150,          -- Maximum depth for caves
     
-    -- Generation options
-    generateFeatures: boolean?,     -- Enable stalactites, crystals, etc.
-    generateWaterFlow: boolean?,    -- Enable water flow simulation
-    generateEntrances: boolean?,    -- Enable surface entrance detection
+    -- Features
+    generateStalactites = true, -- Add cave decorations
+    waterLevel = -80,         -- Y level for water
     
-    -- Performance settings
-    enableProgressReporting: boolean?,    -- Enable progress callbacks
-    enableDebugVisualization: boolean?,   -- Enable debug visualization
-    memoryOptimized: boolean?             -- Enable memory optimizations
+    -- Performance
+    resolution = 4,           -- Voxel resolution in studs
+    chunkSize = 64           -- Chunk size for processing
 }
+
+local result = CaveGenerator.generateCaves(terrain, region, settings)
 ```
 
 ### Preset Configurations
 
 ```lua
--- Available presets
-ProceduralCaveGenerator.Presets = {
-    SMALL_TEST_CAVE,        -- 64x64x64 test cave
-    REALISTIC_CAVE_SYSTEM,  -- 256x256x144 realistic network
-    MASSIVE_CAVE_NETWORK,   -- 512x512x200 dense cave system
-    PERFORMANCE_OPTIMIZED   -- 512x512x128 optimized for speed
+-- Use built-in presets for immediate good results
+CaveGenerator.Presets = {
+    SMALL_TEST,        -- Good for development and testing
+    DENSE_CAVES,       -- Dense cave network
+    BIG_CAVERNS,       -- Large open spaces
+    FAST_GENERATION    -- Performance optimized
 }
 
--- Usage
-local settings = ProceduralCaveGenerator.Presets.REALISTIC_CAVE_SYSTEM
-local result = ProceduralCaveGenerator.generateCaveSystem(terrain, settings)
+-- Example usage
+local result = CaveGenerator.generateCaves(terrain, region, CaveGenerator.Presets.DENSE_CAVES)
+```
+
+## 🎮 Examples
+
+### Basic Cave Generation
+
+```lua
+local CaveExamples = require(script.CaveGenerationExample)
+
+-- Generate caves at origin
+CaveExamples.generateBasicCaves(workspace.Terrain)
+
+-- Generate at specific position
+CaveExamples.generateBasicCaves(workspace.Terrain, Vector3.new(100, -64, 100))
+```
+
+### Custom Cave System
+
+```lua
+local customSettings = {
+    caveThreshold = 0.35,     -- Slightly easier to form caves
+    caveScale = 0.025,        -- Smaller cave features
+    tunnelScale = 0.02,       -- Smaller tunnels
+    chamberScale = 0.06,      -- Medium chambers
+    minDepth = -30,           -- Caves closer to surface
+    generateStalactites = true,
+    waterLevel = -70
+}
+
+CaveExamples.generateCustomCaves(workspace.Terrain)
+```
+
+### Performance Testing
+
+```lua
+-- Quick test for development
+CaveExamples.generateQuickTest(workspace.Terrain)
+
+-- Clear test area
+CaveExamples.clearTestArea(workspace.Terrain)
 ```
 
 ## 🔧 Algorithm Details
 
-### Stage 1: Abstract Data Generation
-- Instantiates NoiseLib generator with high-performance configuration
-- Creates 3D cave grid at 4-stud resolution using `generateRealisticCaves`
-- Combines multiple noise layers (tunnels, chambers, vertical shafts, details)
-- Applies depth-based probability for realistic cave distribution
+### Core Cave Generation Approach
 
-### Stage 2: Logical Structure Analysis
-- Extracts air points from cave grid
-- Uses `analyzeCaveNetworks` to find interconnected cave systems
-- Uses `findCaveEntrances` to locate surface openings
-- Applies `simulateWaterFlow` for realistic erosion patterns
+1. **3D Density Field**: Creates a continuous 3D field that determines cave vs rock
+2. **Multi-Scale Noise**: Combines large chambers, medium tunnels, and small details
+3. **Connectivity Check**: Ensures each cave voxel connects to at least 2 neighbors
+4. **Depth-Based Probability**: More caves at medium depths, fewer near surface/bottom
+5. **Chunk Processing**: Efficiently processes terrain in chunks using `WriteVoxels`
 
-### Stage 3: Terrain Voxel Preparation
-- Divides region into optimized chunks
-- Initializes materials and occupancies 3D arrays
-- Populates based on cave data properties (isAir, contents, etc.)
-- Handles different materials: rock, air, water, lava
+### Noise Combination Strategy
 
-### Stage 4: Voxel Data Rendering
-- Single `Terrain:WriteVoxels` call per chunk for maximum performance
-- Optimized chunk size and resolution for quality vs. performance balance
-- Memory-efficient processing with automatic cleanup
-
-### Stage 5: Detailed Feature Placement
-- Iterates through air points calling `generateCaveFeatures`
-- Renders geological formations based on feature types:
-  - **Stalactites and stalagmites** using `Terrain:FillBlock`
-  - **Crystal formations** with procedural colors using `Terrain:FillBall`
-  - **Underground pools** using `Terrain:FillBall`
-  - **Cave decorations** based on cave characteristics
-
-## 🎮 Feature Types
-
-### Geological Features
-- **Stalactites** - Hanging rock formations from cave ceilings
-- **Stalagmites** - Rising rock formations from cave floors  
-- **Crystal Formations** - Colorful crystal clusters with procedural colors
-- **Underground Pools** - Water-filled cave chambers
-- **Cave Decorations** - Additional atmospheric elements
-
-### Water Flow Features
-- **Flow Paths** - Realistic water flow simulation from sources to destinations
-- **Erosion Patterns** - Cave modification based on water flow
-- **Water Sources** - Higher elevation caves that generate flow
-- **Flow Visualization** - Debug lines showing water movement
-
-### Cave Network Features
-- **Interconnected Systems** - Connected cave networks with accurate pathfinding
-- **Surface Entrances** - Natural openings to the surface
-- **Network Analysis** - Grouping of related cave systems
-- **Connectivity Control** - Adjustable connection density
-
-## 📊 Performance Optimization
-
-### Memory Management
-- Automatic memory cleanup and garbage collection
-- Configurable cache sizes and cleanup thresholds
-- Memory usage estimation tools
-- Chunk-based processing to limit memory usage
-
-### Processing Optimization
-- Configurable yield intervals to prevent timeouts
-- Asynchronous generation with progress reporting
-- Performance profiling and statistics
-- Optimized noise function caching
-
-### Quality vs Performance
 ```lua
--- High Quality (slower)
-settings.resolution = 2        -- Higher resolution
-settings.chunkSize = 32       -- Smaller chunks
-settings.generateFeatures = true
+-- Large-scale chambers (big open spaces)
+local chambers = noiseGen:simplex3D(x * chamberScale, y * chamberScale, z * chamberScale)
 
--- High Performance (faster)
-settings.resolution = 8        -- Lower resolution
-settings.chunkSize = 128      -- Larger chunks
-settings.generateFeatures = false
+-- Medium-scale tunnels (connecting passages)
+local tunnels = noiseGen:simplex3D(x * tunnelScale, y * tunnelScale * 0.5, z * tunnelScale)
+
+-- Small-scale detail (roughness and variation)
+local detail = noiseGen:simplex3D(x * detailScale, y * detailScale, z * detailScale)
+
+-- Key: Use MAX to create connections, not addition
+local caveValue = math.max(chambers * 0.7, tunnels * 0.8) + detail * 0.2
 ```
 
-## 🛠️ Debug Tools
+### Connectivity Filtering
 
-### Visualization
+The system checks each potential cave voxel to ensure it connects to at least 2 neighboring cave voxels, preventing isolated floating rocks while allowing natural cave endpoints.
+
+## 🎯 Quality vs Performance
+
+### High Quality
 ```lua
--- Generate debug visualization
-local viz = ProceduralCaveGenerator.generateDebugVisualization(result)
-CaveExample.createDebugVisualization(viz)
-```
-
-### Performance Analysis
-```lua
--- Get performance statistics
-local stats = generator:getPerformanceStats()
-print("Cache Hit Rate:", stats.cacheStats.hits / (stats.cacheStats.hits + stats.cacheStats.misses))
-print("Peak Memory:", stats.peakMemoryUsage, "KB")
-print("Avg Execution Time:", stats.averageExecutionTime, "ms")
-```
-
-### Benchmarking
-```lua
--- Run comprehensive benchmarks
-local benchmarks = CaveExample.benchmarkGeneration(workspace.Terrain)
-for testName, time in pairs(benchmarks) do
-    print(testName, ":", time, "seconds")
-end
-```
-
-## 📈 Usage Examples
-
-### Small Test Cave (Development)
-```lua
-local settings = {
-    region = Region3.new(Vector3.new(-64, -96, -64), Vector3.new(64, -16, 64)),
-    chunkSize = 32,
-    resolution = 4,
-    caveSettings = {
-        threshold = 0.4,
-        optimalDepth = -60,
-        connectivity = 0.8
-    },
-    generateFeatures = true
+{
+    resolution = 4,           -- Higher resolution
+    chunkSize = 64,           -- Moderate chunks
+    generateStalactites = true,
+    caveScale = 0.025         -- Detailed features
 }
 ```
 
-### Large Cave Network (Production)
+### High Performance
 ```lua
-local settings = {
-    region = Region3.new(Vector3.new(-256, -160, -256), Vector3.new(256, -16, 256)),
-    chunkSize = 64,
-    resolution = 4,
-    caveSettings = {
-        threshold = 0.35,
-        optimalDepth = -80,
-        depthRange = 50,
-        connectivity = 0.7
-    },
-    generateFeatures = true,
-    generateWaterFlow = true,
-    generateEntrances = true
+{
+    resolution = 8,           -- Lower resolution
+    chunkSize = 128,          -- Larger chunks
+    generateStalactites = false,
+    caveScale = 0.035         -- Simpler features
 }
 ```
 
-### Performance Optimized (Large Worlds)
+## 🛠️ Utility Functions
+
 ```lua
-local settings = {
-    region = Region3.new(Vector3.new(-512, -128, -512), Vector3.new(512, 0, 512)),
-    chunkSize = 128,
-    resolution = 8,  -- Lower resolution
-    caveSettings = {
-        threshold = 0.4,
-        connectivity = 0.5
-    },
-    generateFeatures = false,  -- Disable for performance
-    generateWaterFlow = false,
-    memoryOptimized = true
-}
+-- Create test regions easily
+local region = CaveGenerator.createTestRegion(centerPos, size)
+
+-- Clear terrain for testing
+CaveGenerator.clearTerrain(terrain, region)
+
+-- Simple generation with good defaults
+local result = CaveGenerator.generateCaves(terrain, region)
 ```
 
 ## ⚠️ Best Practices
 
+### For Good Results
+1. **Start with defaults** - They're tuned to work well immediately
+2. **Use presets** - Try different presets before custom settings
+3. **Test small first** - Use small regions for experimentation
+4. **Check connectivity** - Lower thresholds create more connected caves
+5. **Mind the depth** - Set appropriate minDepth/maxDepth for your world
+
 ### Performance Guidelines
-1. **Start small** - Test with small regions first
-2. **Monitor memory** - Use memory estimation tools
-3. **Adjust resolution** - Lower resolution for larger areas
-4. **Disable features** - Turn off features for performance-critical scenarios
-5. **Use chunks** - Optimal chunk size is 64-128 studs
+1. **Start small** - Test with 64x64x64 regions first
+2. **Adjust resolution** - Use 8-stud resolution for large areas
+3. **Use larger chunks** - 128-stud chunks for better performance
+4. **Disable features** - Turn off stalactites for performance-critical scenarios
 
-### Quality Guidelines
-1. **Cave threshold** - 0.3-0.5 range for good cave density
-2. **Optimal depth** - -60 to -80 for realistic underground caves
-3. **Connectivity** - 0.6-0.8 for good cave networks
-4. **Feature balance** - Enable all features for maximum realism
+## 🎉 What's New
 
-### Error Handling
-```lua
--- Always check results
-if not result.success then
-    warn("Generation failed:", result.error)
-    return
-end
+This is a complete rewrite focused on:
+- **Simplicity over complexity** - Removed unnecessary abstractions
+- **Visual quality** - Caves that actually look like caves
+- **Immediate results** - Good defaults that work out of the box
+- **Clean connectivity** - No more floating rocks or disconnected segments
+- **Easy configuration** - Simple settings that make sense
 
--- Validate settings before generation
-if not ProceduralCaveGenerator.validateSettings(settings) then
-    warn("Invalid settings")
-    return
-end
-
--- Estimate memory usage
-local estimatedMemory = ProceduralCaveGenerator.estimateMemoryUsage(settings)
-if estimatedMemory > 100 * 1024 * 1024 then  -- 100MB
-    warn("Memory usage may be too high:", estimatedMemory / 1024 / 1024, "MB")
-end
-```
-
-## 🤝 Contributing
-
-This cave generation system is built on top of the powerful NoiseLib module. When contributing:
-
-1. Maintain compatibility with NoiseLib's API
-2. Follow the 5-stage algorithm structure
-3. Include comprehensive error handling
-4. Add performance optimizations where possible
-5. Include examples and documentation
-
-## 📄 License
-
-This project builds upon the NoiseLib module. Please refer to the original NoiseLib license for usage terms.
+The old complex 5-stage system has been replaced with a focused approach that produces beautiful caves with minimal configuration.
