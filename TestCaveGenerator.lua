@@ -182,48 +182,51 @@ local MockAPI = createMockRobloxAPI()
 
 -- Mock require function to load our modules
 local function mockRequire(modulePath)
+	local filename = nil
+	local contentModifier = nil
+	
 	if modulePath == "script.Parent.NoiseLib" or modulePath:match("NoiseLib") then
-		-- Load NoiseLib
-		local file = io.open("NoiseLib.lua", "r")
-		if file then
-			local content = file:read("*all")
-			file:close()
-			local chunk = load(content)
-			if chunk then
-				return chunk()
-			end
-		end
-		error("Could not load NoiseLib.lua")
+		filename = "NoiseLib.lua"
 	elseif modulePath == "script.ProceduralCaveGenerator" or modulePath:match("ProceduralCaveGenerator") then
-		-- Load ProceduralCaveGenerator
-		local file = io.open("ProceduralCaveGenerator.lua", "r")
-		if file then
-			local content = file:read("*all")
-			file:close()
-			-- Replace the require call in the content
-			content = content:gsub("require%(script%.Parent%.NoiseLib%)", "mockRequire('NoiseLib')")
-			local chunk = load(content)
-			if chunk then
-				return chunk()
-			end
+		filename = "ProceduralCaveGenerator.lua"
+		contentModifier = function(content)
+			return content:gsub("require%(script%.Parent%.NoiseLib%)", "mockRequire('NoiseLib')")
 		end
-		error("Could not load ProceduralCaveGenerator.lua")
 	elseif modulePath == "script.CaveGenerationExample" or modulePath:match("CaveGenerationExample") then
-		-- Load CaveGenerationExample
-		local file = io.open("CaveGenerationExample.lua", "r")
-		if file then
-			local content = file:read("*all")
-			file:close()
-			-- Replace the require call in the content
-			content = content:gsub("require%(script%.Parent%.ProceduralCaveGenerator%)", "mockRequire('ProceduralCaveGenerator')")
-			local chunk = load(content)
-			if chunk then
-				return chunk()
-			end
+		filename = "CaveGenerationExample.lua"
+		contentModifier = function(content)
+			return content:gsub("require%(script%.Parent%.ProceduralCaveGenerator%)", "mockRequire('ProceduralCaveGenerator')")
 		end
-		error("Could not load CaveGenerationExample.lua")
+	else
+		error("Unknown module: " .. tostring(modulePath))
 	end
-	error("Unknown module: " .. tostring(modulePath))
+	
+	-- Try to load the file
+	local file = io.open(filename, "r")
+	if not file then
+		error("Could not open " .. filename)
+	end
+	
+	local content = file:read("*all")
+	file:close()
+	
+	-- Apply content modifications if needed
+	if contentModifier then
+		content = contentModifier(content)
+	end
+	
+	-- Load and execute the chunk
+	local chunk, loadError = load(content, filename)
+	if not chunk then
+		error("Could not load " .. filename .. ": " .. tostring(loadError))
+	end
+	
+	local success, result = pcall(chunk)
+	if not success then
+		error("Could not execute " .. filename .. ": " .. tostring(result))
+	end
+	
+	return result
 end
 
 -- Set global require
