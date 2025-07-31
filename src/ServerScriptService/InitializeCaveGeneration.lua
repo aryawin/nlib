@@ -13,7 +13,6 @@ API Functions:
 - generateCave(region, config, options): Main generation function
 - generateQuickCave(position, size): Simple cave with defaults
 - generateAdvancedCave(region, customConfig): Full customization
-- generateTestCave(): Generate test cave for debugging
 
 ====================================================================================================
 ]]
@@ -629,57 +628,6 @@ function InitializeCaveGeneration.generateAdvancedCave(region: Region3, customCo
 	return InitializeCaveGeneration.generateCave(region, customConfig, options)
 end
 
-function InitializeCaveGeneration.generateTestCave(): GenerationResult
-	local testPosition = Vector3.new(0, -25, 0)
-	local testSize = Vector3.new(50, 30, 50)
-	local region = Region3.new(testPosition - testSize/2, testPosition + testSize/2)
-	
-	log("DEBUG", "Original region size:", region.Size)
-	
-	-- Align region to terrain grid for WriteVoxels compatibility
-	local resolution = 4 -- Default terrain resolution
-	region = region:ExpandToGrid(resolution)
-	
-	log("DEBUG", "Expanded region size:", region.Size)
-	
-	-- Safety check: if region got too big, limit it
-	local maxAllowedSize = Vector3.new(200, 100, 200)
-	if region.Size.X > maxAllowedSize.X or region.Size.Y > maxAllowedSize.Y or region.Size.Z > maxAllowedSize.Z then
-		log("WARNING", "Region expanded too large, limiting to safe size")
-		region = Region3.new(testPosition - maxAllowedSize/2, testPosition + maxAllowedSize/2)
-	end
-	
-	log("DEBUG", "Final region size:", region.Size)
-	
-	-- Test configuration with debug features enabled
-	local testConfig = {
-		Core = {
-			seed = 12345, -- Fixed seed for reproducible testing
-			enablePerformanceLogging = true,
-			logLevel = "DEBUG"
-		},
-		Debug = {
-			generateTestCave = true,
-			collectMetrics = true,
-			printGenerationStats = true
-		}
-	}
-	
-	local options: GenerationOptions = {
-		enableTier1 = true,
-		enableTier2 = true,
-		enableTier3 = true,
-		enableDebugVisualization = true,
-		enablePerformanceLogging = true,
-		progressCallback = function(progress, stage, details)
-			print(string.format("[TEST] %d%% - %s: %s", math.floor(progress * 100), stage, details or ""))
-		end
-	}
-	
-	log("INFO", "Generating test cave for debugging and validation")
-	return InitializeCaveGeneration.generateCave(region, testConfig, options)
-end
-
 -- ================================================================================================
 --                                    UTILITY FUNCTIONS
 -- ================================================================================================
@@ -827,11 +775,45 @@ local function performAutoGeneration()
 		return
 	end
 	
-	log("INFO", "Performing auto-generation of test cave...")
+	log("INFO", "Performing auto-generation using configured region...")
 	
-	-- Generate a test cave with progress reporting
+	-- Get the active region configuration
+	local regionConfig = Config.getActiveRegion()
+	local region = Region3.new(
+		regionConfig.center - regionConfig.size/2, 
+		regionConfig.center + regionConfig.size/2
+	)
+	
+	log("DEBUG", "Original region size:", region.Size.X, region.Size.Y, region.Size.Z)
+	
+	-- Align region to terrain grid for WriteVoxels compatibility
+	local resolution = 4 -- Default terrain resolution
+	region = region:ExpandToGrid(resolution)
+	
+	log("DEBUG", "Expanded region size:", region.Size.X, region.Size.Y, region.Size.Z)
+	
+	-- Generate cave with progress reporting
 	local success, result = pcall(function()
-		return InitializeCaveGeneration.generateTestCave()
+		local config = {
+			Core = {
+				seed = 12345, -- Fixed seed for reproducible testing
+				enablePerformanceLogging = true,
+				logLevel = "DEBUG"
+			}
+		}
+		
+		local options: GenerationOptions = {
+			enableTier1 = true,
+			enableTier2 = true,
+			enableTier3 = true,
+			enableDebugVisualization = true,
+			enablePerformanceLogging = true,
+			progressCallback = function(progress, stage, details)
+				print(string.format("[AUTO-GEN] %d%% - %s: %s", math.floor(progress * 100), stage, details or ""))
+			end
+		}
+		
+		return InitializeCaveGeneration.generateCave(region, config, options)
 	end)
 	
 	if success and result.success then
