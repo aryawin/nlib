@@ -382,7 +382,7 @@ Config.Presets = {
 
 Config.Region = {
 	-- Active region configuration (priority: customRegion > activePreset > defaultSize)
-	activePreset = nil, -- "TINY", "SMALL", "MEDIUM", "LARGE", "GIGANTIC", etc.
+	activePreset = "SMALL", -- "TINY", "SMALL", "MEDIUM", "LARGE", "GIGANTIC", etc. (set to SMALL for faster testing)
 	customRegion = nil, -- {size = Vector3, center = Vector3} - highest priority
 	
 	-- Default fallback settings

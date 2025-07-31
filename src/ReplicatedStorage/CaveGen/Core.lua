@@ -344,8 +344,8 @@ function Core.setVoxel(position: Vector3, isAir: boolean, material: Enum.Materia
 		y >= 1 and y <= #voxelData[1] and 
 		z >= 1 and z <= #voxelData[1][1] then
 
-		-- Debug: Log first few voxel changes
-		if performanceData.voxelsProcessed < 10 then
+		-- Debug: Log first few voxel changes only
+		if performanceData.voxelsProcessed < 5 then
 			log("DEBUG", "Setting voxel", {
 				position = position,
 				isAir = isAir,
@@ -355,14 +355,9 @@ function Core.setVoxel(position: Vector3, isAir: boolean, material: Enum.Materia
 			})
 		end
 
-		-- For caves: set to 1 for solid rock, 0 for air (WriteVoxels occupancy format)
+		-- For caves: set to 0 for air, 1 for solid (WriteVoxels occupancy format)
 		voxelData[x][y][z] = if isAir then 0 else 1
 		voxelMaterials[x][y][z] = material or (if isAir then config.Core.materialAir else config.Core.materialRock)
-		
-		-- Track voxel changes
-		if isAir then
-			performanceData.voxelsProcessed = performanceData.voxelsProcessed + 1
-		end
 	end
 end
 
@@ -396,6 +391,14 @@ function Core.applyTerrainChanges(region: Region3): ()
 		total = airCount + solidCount,
 		airPercentage = string.format("%.1f%%", (airCount / (airCount + solidCount)) * 100)
 	})
+
+	if airCount == 0 then
+		log("WARNING", "No air voxels found - caves may not have been carved properly!")
+	elseif airCount < (airCount + solidCount) * 0.01 then
+		log("WARNING", "Very few air voxels found - cave generation may have issues")
+	else
+		log("INFO", "Cave generation appears successful with significant air content")
+	end
 
 	-- Convert to Roblox terrain format
 	local minPoint = region.CFrame.Position - region.Size/2
