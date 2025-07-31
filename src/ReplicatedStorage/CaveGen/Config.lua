@@ -311,10 +311,14 @@ Config.Connectivity = {
 --                                    PERFORMANCE
 -- ================================================================================================
 
-Performance = {
+Config.Performance = {
 	-- Relaxed performance targets (<30 seconds instead of <1 second)
 	maxGenerationTime = 60, -- Maximum total generation time in seconds
 	targetVoxelsPerSecond = 50000, -- Target voxel processing rate
+	
+	-- Caching settings
+	enableCaching = true,
+	cacheSize = 1000,
 
 	-- Chunked processing
 	chunkSize = 526, -- Voxels per chunk
