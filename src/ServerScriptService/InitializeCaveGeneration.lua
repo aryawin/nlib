@@ -400,10 +400,21 @@ function InitializeCaveGeneration.generateCave(region: Region3, customConfig: an
 		
 		reportProgress(options, 0.05, "Configuration", "Configuration validated successfully")
 		
-		-- Initialize Core system
-		if not Core.initialize(config) then
-			error("Failed to initialize Core system")
+		-- Initialize Core system with debugging
+		log("DEBUG", "About to initialize Core system...")
+		local coreInitSuccess, coreInitError = pcall(function()
+			return Core.initialize(config)
+		end)
+		
+		if not coreInitSuccess then
+			error("Core initialization failed with error: " .. tostring(coreInitError))
 		end
+		
+		if not coreInitError then
+			error("Core initialization returned false")
+		end
+		
+		log("DEBUG", "Core system initialized successfully")
 		
 		reportProgress(options, 0.1, "Core Initialized", "Core system ready")
 		

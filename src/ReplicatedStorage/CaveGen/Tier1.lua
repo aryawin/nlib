@@ -28,12 +28,22 @@ local function generateMainChambers(region, config)
 	-- Calculate region bounds
 	local minPoint = region.CFrame.Position - region.Size/2
 	local maxPoint = region.CFrame.Position + region.Size/2
+	
+	print("🔍 Region bounds - Min:", minPoint, "Max:", maxPoint)
+	print("🔍 Expected iterations - X:", math.ceil((maxPoint.X - minPoint.X) / 12), 
+		"Y:", math.ceil((maxPoint.Y - minPoint.Y) / 12), 
+		"Z:", math.ceil((maxPoint.Z - minPoint.Z) / 12))
 
 	-- Sample points for potential chambers
 	local sampleStep = 12 -- studs between samples
 	local chamberCount = 0
 
 	local sampleCount = 0
+	local totalExpectedSamples = math.ceil((maxPoint.X - minPoint.X) / sampleStep) * 
+								math.ceil((maxPoint.Y - minPoint.Y) / sampleStep) * 
+								math.ceil((maxPoint.Z - minPoint.Z) / sampleStep)
+	print("🔍 Total expected samples:", totalExpectedSamples)
+	
 	for x = minPoint.X, maxPoint.X, sampleStep do
 		for y = minPoint.Y, maxPoint.Y, sampleStep do
 			for z = minPoint.Z, maxPoint.Z, sampleStep do
@@ -42,7 +52,7 @@ local function generateMainChambers(region, config)
 				-- Yield periodically to prevent hanging
 				if sampleCount % 20 == 0 then
 					task.wait()
-					print("🔍 Sampled", sampleCount, "locations for chambers...")
+					print("🔍 Sampled", sampleCount, "/", totalExpectedSamples, "locations for chambers...")
 				end
 				
 				-- Use Worley noise to identify chamber locations
@@ -406,13 +416,19 @@ function Tier1.generate(region, config)
 	local startTime = tick()
 
 	-- Generate main chambers first
+	print("🏛️ About to generate main chambers...")
 	local chambers = generateMainChambers(region, config)
+	print("🏛️ Main chambers generated:", #chambers)
 
 	-- Connect chambers with passages
+	print("🛤️ About to generate passages...")
 	local passages = generatePassages(chambers, config)
+	print("🛤️ Passages generated:", #passages)
 
 	-- Add vertical shafts to chambers
+	print("⬆️ About to generate vertical shafts...")
 	local shafts = generateVerticalShafts(chambers, config)
+	print("⬆️ Vertical shafts generated:", #shafts)
 
 	local endTime = tick()
 	local generationTime = endTime - startTime

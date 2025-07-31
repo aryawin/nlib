@@ -164,9 +164,21 @@ function Core.initialize(configTable: any): boolean
 		-- Set log level
 		setLogLevel(config.Core.logLevel or "INFO")
 		log("INFO", "Initializing CaveGen Core system...")
+		
+		-- Debug config structure
+		log("DEBUG", "Config structure check - Performance section exists:", config.Performance ~= nil)
+		if config.Performance then
+			log("DEBUG", "Performance settings:", {
+				enableCaching = config.Performance.enableCaching,
+				cacheSize = config.Performance.cacheSize,
+				maxMemoryUsage = config.Performance.maxMemoryUsage
+			})
+		end
 
 		-- Initialize noise generator
 		local seed = config.Core.seed or tick()
+		log("DEBUG", "About to create NoiseLib with seed:", seed)
+		
 		noiseGenerator = NoiseLib.new(seed, {
 			cache = {
 				enabled = config.Performance.enableCaching,
@@ -177,6 +189,8 @@ function Core.initialize(configTable: any): boolean
 				memoryThreshold = config.Performance.maxMemoryUsage
 			}
 		})
+		
+		log("DEBUG", "NoiseLib created successfully")
 
 		-- Store seed in metadata
 		caveData.metadata.seed = seed
