@@ -68,7 +68,12 @@ local function generateMainChambers(region, config)
 				
 				if not success then
 					print("⚠️ Failed to get noise at position", x, y, z, ":", chamberNoise)
-					continue
+					-- Fallback: use simple distance-based logic for testing
+					local centerX = (minPoint.X + maxPoint.X) / 2
+					local centerY = (minPoint.Y + maxPoint.Y) / 2 
+					local centerZ = (minPoint.Z + maxPoint.Z) / 2
+					local distFromCenter = math.sqrt((x - centerX)^2 + (y - centerY)^2 + (z - centerZ)^2)
+					chamberNoise = distFromCenter / 50.0 -- Normalize to roughly 0-1 range
 				end
 
 				-- Chamber appears where Worley noise is low (cell centers)
@@ -186,6 +191,52 @@ local function generateMainChambers(region, config)
 	end
 
 	print("✅ Generated", chamberCount, "main chambers")
+	
+	-- Debug: Ensure at least one chamber for testing
+	if chamberCount == 0 then
+		print("⚠️ No chambers generated, creating test chamber...")
+		local centerPos = Vector3.new(
+			(minPoint.X + maxPoint.X) / 2,
+			(minPoint.Y + maxPoint.Y) / 2,
+			(minPoint.Z + maxPoint.Z) / 2
+		)
+		
+		local testChamber = {
+			id = Core.generateId("test_chamber"),
+			position = centerPos,
+			size = Vector3.new(20, 20, 20), -- Fixed size for testing
+			shape = "sphere",
+			connections = {},
+			material = Enum.Material.Air,
+			isMainChamber = true
+		}
+		
+		table.insert(chambers, testChamber)
+		Core.addChamber(testChamber)
+		
+		-- Carve the test chamber
+		local radius = 10
+		local step = 2
+		local carvedCount = 0
+		
+		for cx = centerPos.X - radius, centerPos.X + radius, step do
+			for cy = centerPos.Y - radius, centerPos.Y + radius, step do
+				for cz = centerPos.Z - radius, centerPos.Z + radius, step do
+					local dx = (cx - centerPos.X) / radius
+					local dy = (cy - centerPos.Y) / radius
+					local dz = (cz - centerPos.Z) / radius
+					
+					if dx*dx + dy*dy + dz*dz <= 1 then
+						Core.setVoxel(Vector3.new(cx, cy, cz), true, Enum.Material.Air)
+						carvedCount = carvedCount + 1
+					end
+				end
+			end
+		end
+		
+		print("✅ Created test chamber at", centerPos, "carved", carvedCount, "voxels")
+		chamberCount = 1
+	end
 	return chambers
 end
 

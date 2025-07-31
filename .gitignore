@@ -1,0 +1,13 @@
+# Test files
+test_cave_generation.lua
+
+# Temporary files
+/tmp/
+
+# Build artifacts
+*.log
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
