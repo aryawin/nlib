@@ -179,17 +179,24 @@ function Core.initialize(configTable: any): boolean
 		local seed = config.Core.seed or tick()
 		log("DEBUG", "About to create NoiseLib with seed:", seed)
 		
-		noiseGenerator = NoiseLib.new(seed, {
-			cache = {
-				enabled = config.Performance.enableCaching,
-				maxSize = config.Performance.cacheSize
-			},
-			performance = {
-				yieldInterval = config.Core.yieldInterval,
-				memoryThreshold = config.Performance.maxMemoryUsage
-			}
-		})
+		local noiseGenSuccess, noiseGenResult = pcall(function()
+			return NoiseLib.new(seed, {
+				cache = {
+					enabled = config.Performance.enableCaching,
+					maxSize = config.Performance.cacheSize
+				},
+				performance = {
+					yieldInterval = config.Core.yieldInterval,
+					memoryThreshold = config.Performance.maxMemoryUsage
+				}
+			})
+		end)
 		
+		if not noiseGenSuccess then
+			error("NoiseLib creation failed: " .. tostring(noiseGenResult))
+		end
+		
+		noiseGenerator = noiseGenResult
 		log("DEBUG", "NoiseLib created successfully")
 
 		-- Store seed in metadata

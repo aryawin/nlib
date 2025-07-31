@@ -294,7 +294,26 @@ local function runGenerationTier(tierFunc: (any, any) -> any, tierName: string, 
 	log("INFO", string.format("Starting %s generation", tierName))
 	
 	local timeout = (options and options.timeout) or config.Core.maxGenerationTime or 60
+	log("DEBUG", string.format("Using timeout of %d seconds for %s", timeout, tierName))
+	
+	-- For debugging: try direct execution first to see if the timeout mechanism is the issue
+	log("DEBUG", "Attempting direct execution (no timeout) for debugging...")
+	local directSuccess, directResult = pcall(function()
+		return tierFunc(region, config)
+	end)
+	
+	if directSuccess then
+		log("DEBUG", "Direct execution succeeded - issue is likely in timeout mechanism")
+		return true, directResult
+	else
+		log("ERROR", "Direct execution failed:", tostring(directResult))
+		return false, directResult
+	end
+	
+	-- Original timeout-based execution (commented out for debugging)
+	--[[
 	local success, result = executeWithTimeout(function()
+		log("DEBUG", string.format("Executing %s generation function...", tierName))
 		return tierFunc(region, config)
 	end, timeout)
 	
@@ -305,6 +324,7 @@ local function runGenerationTier(tierFunc: (any, any) -> any, tierName: string, 
 		log("ERROR", string.format("%s generation failed: %s", tierName, tostring(result)))
 		return false, result
 	end
+	--]]
 end
 
 -- ================================================================================================
@@ -422,17 +442,27 @@ function InitializeCaveGeneration.generateCave(region: Region3, customConfig: an
 		Core.clearCaveData()
 		
 		-- Initialize terrain buffer
+		log("DEBUG", "About to initialize terrain buffer...")
 		Core.initializeTerrainBuffer(region)
+		log("DEBUG", "Terrain buffer initialized successfully")
 		reportProgress(options, 0.15, "Terrain Buffer", "Terrain buffer initialized")
 		
 		-- Start performance monitoring
+		log("DEBUG", "About to start performance monitoring...")
 		Core.startPerformanceMonitoring()
+		log("DEBUG", "Performance monitoring started successfully")
 		
 		-- TIER 1: Foundation Generation
+		log("DEBUG", "Checking Tier 1 conditions - options nil?", options == nil)
+		log("DEBUG", "Tier 1 enabled?", config.Tier1.enabled)
+		
 		if (options == nil or options.enableTier1 ~= false) and config.Tier1.enabled then
+			log("DEBUG", "Tier 1 conditions met, proceeding with generation")
 			reportProgress(options, 0.2, "Tier 1", "Generating foundation features")
 			
+			log("DEBUG", "About to call runGenerationTier for Tier 1")
 			local tier1Success, tier1Result = runGenerationTier(Tier1.generate, "Tier 1", region, config, options)
+			log("DEBUG", "runGenerationTier completed - success:", tier1Success)
 			if tier1Success and tier1Result then
 				result.features.chambers = #(tier1Result.chambers or {})
 				result.features.passages = #(tier1Result.passages or {})
@@ -604,9 +634,22 @@ function InitializeCaveGeneration.generateTestCave(): GenerationResult
 	local testSize = Vector3.new(50, 30, 50)
 	local region = Region3.new(testPosition - testSize/2, testPosition + testSize/2)
 	
+	log("DEBUG", "Original region size:", region.Size)
+	
 	-- Align region to terrain grid for WriteVoxels compatibility
 	local resolution = 4 -- Default terrain resolution
 	region = region:ExpandToGrid(resolution)
+	
+	log("DEBUG", "Expanded region size:", region.Size)
+	
+	-- Safety check: if region got too big, limit it
+	local maxAllowedSize = Vector3.new(200, 100, 200)
+	if region.Size.X > maxAllowedSize.X or region.Size.Y > maxAllowedSize.Y or region.Size.Z > maxAllowedSize.Z then
+		log("WARNING", "Region expanded too large, limiting to safe size")
+		region = Region3.new(testPosition - maxAllowedSize/2, testPosition + maxAllowedSize/2)
+	end
+	
+	log("DEBUG", "Final region size:", region.Size)
 	
 	-- Test configuration with debug features enabled
 	local testConfig = {
