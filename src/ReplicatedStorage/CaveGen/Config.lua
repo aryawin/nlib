@@ -75,7 +75,7 @@ Config.Tier1 = {
 		enabled = true,
 		minSize = 15, -- studs (increased for larger caves)
 		maxSize = 45, -- increased for larger caves
-		densityThreshold = 0.08, -- Lower = more chambers (reduced for fewer, larger chambers)
+		densityThreshold = 0.15, -- Lower = more chambers (increased for more chamber generation)
 		asymmetryFactor = 0.3,
 		heightVariation = 0.4
 	},

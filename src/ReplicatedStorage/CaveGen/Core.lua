@@ -344,9 +344,25 @@ function Core.setVoxel(position: Vector3, isAir: boolean, material: Enum.Materia
 		y >= 1 and y <= #voxelData[1] and 
 		z >= 1 and z <= #voxelData[1][1] then
 
+		-- Debug: Log first few voxel changes
+		if performanceData.voxelsProcessed < 10 then
+			log("DEBUG", "Setting voxel", {
+				position = position,
+				isAir = isAir,
+				voxelIndex = {x, y, z},
+				oldValue = voxelData[x][y][z],
+				newValue = if isAir then 0 else 1
+			})
+		end
+
 		-- For caves: set to 1 for solid rock, 0 for air (WriteVoxels occupancy format)
 		voxelData[x][y][z] = if isAir then 0 else 1
 		voxelMaterials[x][y][z] = material or (if isAir then config.Core.materialAir else config.Core.materialRock)
+		
+		-- Track voxel changes
+		if isAir then
+			performanceData.voxelsProcessed = performanceData.voxelsProcessed + 1
+		end
 	end
 end
 
