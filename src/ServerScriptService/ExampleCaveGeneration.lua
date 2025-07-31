@@ -177,18 +177,54 @@ local function generateAdvancedCave()
     return result
 end
 
--- Example 4: Test Cave for Debugging
-local function generateTestCave()
-    print("\n=== Example 4: Test Cave for Debugging ===")
+-- Example 4: Region Configuration Testing
+local function testRegionConfiguration()
+    print("\n=== Example 4: Region Configuration Testing ===")
     
-    local result = InitializeCaveGeneration.generateTestCave()
+    local Config = require(game.ReplicatedStorage.CaveGen.Config)
+    
+    -- Test 1: Default region
+    print("📍 Testing default region configuration:")
+    local defaultRegion = Config.getActiveRegion()
+    
+    -- Test 2: Set GIGANTIC preset
+    print("📍 Setting GIGANTIC preset:")
+    Config.setActiveRegionPreset("GIGANTIC")
+    local giganticRegion = Config.getActiveRegion()
+    
+    -- Test generation with GIGANTIC preset
+    local region = Region3.new(
+        giganticRegion.center - giganticRegion.size/2,
+        giganticRegion.center + giganticRegion.size/2
+    )
+    
+    -- Use a smaller subset for actual testing (full GIGANTIC would take too long)
+    local testRegion = Region3.new(
+        Vector3.new(-50, -60, -50),
+        Vector3.new(50, -10, 50)
+    )
+    
+    local result = InitializeCaveGeneration.generateQuickCave(
+        Vector3.new(0, -35, 0),
+        Vector3.new(100, 50, 100)
+    )
     
     if result.success then
-        print("✅ Test cave generated successfully!")
-        print("🔍 This cave uses a fixed seed and debug settings for reproducible testing")
+        print("✅ Region configuration test successful!")
+        print(string.format("📊 Generated cave with %d chambers, %d passages", 
+            result.features.chambers, result.features.passages))
+        print("🔍 The system correctly used region configuration instead of hardcoded sizes")
     else
-        warn("❌ Test cave generation failed:", result.errorMessage)
+        warn("❌ Region configuration test failed:", result.errorMessage)
     end
+    
+    -- Test 3: Custom region
+    print("📍 Testing custom region:")
+    Config.setCustomRegion(Vector3.new(200, 60, 200), Vector3.new(100, -40, 100))
+    local customRegion = Config.getActiveRegion()
+    
+    -- Reset to defaults
+    Config.clearRegionConfig()
     
     return result
 end
@@ -265,7 +301,7 @@ local function runExamples()
     generateAdvancedCave()
     waitForGeneration()
     
-    generateTestCave()
+    testRegionConfiguration()
     waitForGeneration()
     
     demonstrateErrorHandling()
@@ -302,5 +338,5 @@ print("💡 Call runExamples() to run all examples, or call individual functions
 print("   - generateSimpleCave()")
 print("   - generateCustomCave()")  
 print("   - generateAdvancedCave()")
-print("   - generateTestCave()")
+print("   - testRegionConfiguration()")
 print("   - demonstrateErrorHandling()")

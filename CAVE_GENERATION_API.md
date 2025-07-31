@@ -92,11 +92,6 @@ Generate a cave with all features enabled and extended timeout.
 
 **Returns:** `GenerationResult`
 
-#### `generateTestCave()`
-Generate a test cave with fixed seed and debug features enabled.
-
-**Returns:** `GenerationResult`
-
 ### Utility Functions
 
 #### `isGenerating()`

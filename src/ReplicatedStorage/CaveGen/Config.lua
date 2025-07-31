@@ -377,6 +377,44 @@ Config.Presets = {
 }
 
 -- ================================================================================================
+--                                    REGION SIZE CONFIGURATION
+-- ================================================================================================
+
+Config.Region = {
+	-- Active region configuration (priority: customRegion > activePreset > defaultSize)
+	activePreset = nil, -- "TINY", "SMALL", "MEDIUM", "LARGE", "GIGANTIC", etc.
+	customRegion = nil, -- {size = Vector3, center = Vector3} - highest priority
+	
+	-- Default fallback settings
+	defaultSize = Vector3.new(100, 50, 100),
+	defaultCenter = Vector3.new(0, -25, 0),
+	
+	-- Region presets
+	presets = {
+		TINY = {
+			size = Vector3.new(30, 20, 30),
+			center = Vector3.new(0, -15, 0)
+		},
+		SMALL = {
+			size = Vector3.new(60, 30, 60),
+			center = Vector3.new(0, -20, 0)
+		},
+		MEDIUM = {
+			size = Vector3.new(100, 50, 100),
+			center = Vector3.new(0, -25, 0)
+		},
+		LARGE = {
+			size = Vector3.new(300, 80, 300),
+			center = Vector3.new(0, -40, 0)
+		},
+		GIGANTIC = {
+			size = Vector3.new(1200, 150, 1200),
+			center = Vector3.new(0, -80, 0)
+		}
+	}
+}
+
+-- ================================================================================================
 --                                    DEBUGGING
 -- ================================================================================================
 
@@ -386,16 +424,84 @@ Config.Debug = {
 	visualizePathfinding = true,
 	visualizeNoise = true,
 
-	-- Testing
-	generateTestCave = false,
-	testCaveSize = Vector3.new(50, 30, 50),
-	testCavePosition = Vector3.new(0, -25, 0),
-
 	-- Metrics
 	collectMetrics = true,
 	printGenerationStats = true,
 	saveDebugData = false
 }
+
+-- ================================================================================================
+--                                    REGION CONFIGURATION UTILITIES
+-- ================================================================================================
+
+-- Get the active region configuration based on priority system
+function Config.getActiveRegion(): {size: Vector3, center: Vector3}
+	-- Priority 1: Custom region (highest priority)
+	if Config.Region.customRegion then
+		local custom = Config.Region.customRegion
+		if custom.size and custom.center then
+			print("📍 Using CUSTOM region:", custom.size, "at", custom.center)
+			return {
+				size = custom.size,
+				center = custom.center
+			}
+		else
+			warn("Invalid customRegion configuration - missing size or center")
+		end
+	end
+	
+	-- Priority 2: Active preset
+	if Config.Region.activePreset then
+		local presetName = Config.Region.activePreset
+		local preset = Config.Region.presets[presetName]
+		if preset then
+			print("📍 Using PRESET region:", presetName, preset.size, "at", preset.center)
+			return {
+				size = preset.size,
+				center = preset.center
+			}
+		else
+			warn("Unknown region preset:", presetName)
+		end
+	end
+	
+	-- Priority 3: Default fallback
+	print("📍 Using DEFAULT region:", Config.Region.defaultSize, "at", Config.Region.defaultCenter)
+	return {
+		size = Config.Region.defaultSize,
+		center = Config.Region.defaultCenter
+	}
+end
+
+-- Set the active region preset
+function Config.setActiveRegionPreset(presetName: string): boolean
+	if Config.Region.presets[presetName] then
+		Config.Region.activePreset = presetName
+		Config.Region.customRegion = nil -- Clear custom region when setting preset
+		print("✅ Set active region preset to:", presetName)
+		return true
+	else
+		warn("Unknown region preset:", presetName)
+		return false
+	end
+end
+
+-- Set a custom region
+function Config.setCustomRegion(size: Vector3, center: Vector3): ()
+	Config.Region.customRegion = {
+		size = size,
+		center = center
+	}
+	Config.Region.activePreset = nil -- Clear preset when setting custom region
+	print("✅ Set custom region:", size, "at", center)
+end
+
+-- Clear region configuration (use defaults)
+function Config.clearRegionConfig(): ()
+	Config.Region.activePreset = nil
+	Config.Region.customRegion = nil
+	print("✅ Cleared region configuration - using defaults")
+end
 
 -- ================================================================================================
 --                                    CONFIGURATION UTILITIES
