@@ -748,6 +748,61 @@ if not InitializeCaveGeneration.validateModules() then
 	warn("InitializeCaveGeneration: Module validation failed - some features may not work")
 end
 
+-- ================================================================================================
+--                                    PRESET-BASED GENERATION
+-- ================================================================================================
+
+-- Generate a cave using one of the built-in presets
+function InitializeCaveGeneration.generateCaveWithPreset(position: Vector3, size: Vector3?, presetName: string?, options: GenerationOptions?): GenerationResult
+	local preset = presetName or "medium"
+	local caveSize = size or Vector3.new(100, 50, 100)
+	
+	log("INFO", string.format("Generating cave with preset '%s' at position %s, size %s", preset, tostring(position), tostring(caveSize)))
+	
+	-- Create region from position and size
+	local halfSize = caveSize / 2
+	local region = Region3.new(position - halfSize, position + halfSize)
+	
+	-- Get preset configuration
+	local config = Config.withPreset(preset)
+	if not config then
+		return {
+			success = false,
+			errorMessage = "Invalid preset: " .. preset,
+			generationTime = 0,
+			totalVoxels = 0,
+			memoryUsed = 0,
+			features = {
+				chambers = 0, passages = 0, verticalShafts = 0,
+				branches = 0, subChambers = 0, collapseRooms = 0,
+				hiddenPockets = 0, microFeatures = 0
+			}
+		}
+	end
+	
+	-- Set up options based on preset
+	local genOptions = options or {}
+	if preset == "small" then
+		genOptions.enableTier1 = true
+		genOptions.enableTier2 = false
+		genOptions.enableTier3 = false
+		genOptions.timeout = 15
+	elseif preset == "medium" then
+		genOptions.enableTier1 = true
+		genOptions.enableTier2 = true
+		genOptions.enableTier3 = false
+		genOptions.timeout = 30
+	elseif preset == "large" then
+		genOptions.enableTier1 = true
+		genOptions.enableTier2 = true
+		genOptions.enableTier3 = true
+		genOptions.timeout = 60
+	end
+	
+	-- Generate the cave
+	return InitializeCaveGeneration.generateCave(region, config, genOptions)
+end
+
 log("INFO", "InitializeCaveGeneration v" .. GENERATION_VERSION .. " loaded successfully")
 
 -- ================================================================================================

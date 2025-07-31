@@ -24,11 +24,8 @@ local function generateSimpleCave()
     local position = Vector3.new(100, -25, 0) -- Offset from spawn
     local size = Vector3.new(80, 40, 80) -- Optimized size for better caves
     
-    -- Apply medium preset for better performance and larger caves
-    local Config = require(game.ReplicatedStorage.CaveGen.Config)
-    Config.applyPreset("medium")
-    
-    local result = InitializeCaveGeneration.generateQuickCave(position, size)
+    -- Use the new preset-based generation
+    local result = InitializeCaveGeneration.generateCaveWithPreset(position, size, "medium")
     
     if result.success then
         print("✅ Simple cave generated successfully!")
@@ -294,6 +291,11 @@ end
 -- generateSimpleCave()
 -- generateCustomCave()
 -- generateAdvancedCave()
+
+-- Quick preset examples:
+-- InitializeCaveGeneration.generateCaveWithPreset(Vector3.new(0, -30, 0), Vector3.new(60, 30, 60), "small")
+-- InitializeCaveGeneration.generateCaveWithPreset(Vector3.new(0, -30, 0), Vector3.new(100, 50, 100), "medium")
+-- InitializeCaveGeneration.generateCaveWithPreset(Vector3.new(0, -30, 0), Vector3.new(150, 80, 150), "large")
 
 print("💡 Cave Generation Examples loaded!")
 print("💡 Call runExamples() to run all examples, or call individual functions:")
