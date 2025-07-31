@@ -164,19 +164,40 @@ function Core.initialize(configTable: any): boolean
 		-- Set log level
 		setLogLevel(config.Core.logLevel or "INFO")
 		log("INFO", "Initializing CaveGen Core system...")
+		
+		-- Debug config structure
+		log("DEBUG", "Config structure check - Performance section exists:", config.Performance ~= nil)
+		if config.Performance then
+			log("DEBUG", "Performance settings:", {
+				enableCaching = config.Performance.enableCaching,
+				cacheSize = config.Performance.cacheSize,
+				maxMemoryUsage = config.Performance.maxMemoryUsage
+			})
+		end
 
 		-- Initialize noise generator
 		local seed = config.Core.seed or tick()
-		noiseGenerator = NoiseLib.new(seed, {
-			cache = {
-				enabled = config.Performance.enableCaching,
-				maxSize = config.Performance.cacheSize
-			},
-			performance = {
-				yieldInterval = config.Core.yieldInterval,
-				memoryThreshold = config.Performance.maxMemoryUsage
-			}
-		})
+		log("DEBUG", "About to create NoiseLib with seed:", seed)
+		
+		local noiseGenSuccess, noiseGenResult = pcall(function()
+			return NoiseLib.new(seed, {
+				cache = {
+					enabled = config.Performance.enableCaching,
+					maxSize = config.Performance.cacheSize
+				},
+				performance = {
+					yieldInterval = config.Core.yieldInterval,
+					memoryThreshold = config.Performance.maxMemoryUsage
+				}
+			})
+		end)
+		
+		if not noiseGenSuccess then
+			error("NoiseLib creation failed: " .. tostring(noiseGenResult))
+		end
+		
+		noiseGenerator = noiseGenResult
+		log("DEBUG", "NoiseLib created successfully")
 
 		-- Store seed in metadata
 		caveData.metadata.seed = seed
@@ -301,8 +322,8 @@ function Core.initializeTerrainBuffer(region: Region3): ()
 		voxelData[x] = table.create(voxelsY)
 		voxelMaterials[x] = table.create(voxelsY)
 		for y = 1, voxelsY do
-			voxelData[x][y] = table.create(voxelsZ, 0) -- 0 = air, 1 = solid
-			voxelMaterials[x][y] = table.create(voxelsZ, config.Core.materialAir)
+			voxelData[x][y] = table.create(voxelsZ, 1) -- 0 = air, 1 = solid (start with solid rock)
+			voxelMaterials[x][y] = table.create(voxelsZ, config.Core.materialRock)
 		end
 	end
 
@@ -342,6 +363,29 @@ function Core.applyTerrainChanges(region: Region3): ()
 
 	-- Apply via WriteVoxels
 	local success, err = pcall(function()
+		-- Validate array dimensions
+		if not voxelData or #voxelData == 0 then
+			error("voxelData is empty")
+		end
+		if not voxelMaterials or #voxelMaterials == 0 then
+			error("voxelMaterials is empty")
+		end
+		
+		-- Check dimensions match
+		local expectedX = math.ceil(region.Size.X / resolution)
+		local expectedY = math.ceil(region.Size.Y / resolution)
+		local expectedZ = math.ceil(region.Size.Z / resolution)
+		
+		if #voxelData ~= expectedX then
+			error(string.format("X dimension mismatch: expected %d, got %d", expectedX, #voxelData))
+		end
+		if #voxelData[1] ~= expectedY then
+			error(string.format("Y dimension mismatch: expected %d, got %d", expectedY, #voxelData[1]))
+		end
+		if #voxelData[1][1] ~= expectedZ then
+			error(string.format("Z dimension mismatch: expected %d, got %d", expectedZ, #voxelData[1][1]))
+		end
+		
 		workspace.Terrain:WriteVoxels(
 			region,
 			resolution,

@@ -28,35 +28,72 @@ local function generateMainChambers(region, config)
 	-- Calculate region bounds
 	local minPoint = region.CFrame.Position - region.Size/2
 	local maxPoint = region.CFrame.Position + region.Size/2
+	
+	print("🔍 Region bounds - Min:", minPoint, "Max:", maxPoint)
+	print("🔍 Expected iterations - X:", math.ceil((maxPoint.X - minPoint.X) / 12), 
+		"Y:", math.ceil((maxPoint.Y - minPoint.Y) / 12), 
+		"Z:", math.ceil((maxPoint.Z - minPoint.Z) / 12))
 
 	-- Sample points for potential chambers
 	local sampleStep = 12 -- studs between samples
 	local chamberCount = 0
 
+	local sampleCount = 0
+	local totalExpectedSamples = math.ceil((maxPoint.X - minPoint.X) / sampleStep) * 
+								math.ceil((maxPoint.Y - minPoint.Y) / sampleStep) * 
+								math.ceil((maxPoint.Z - minPoint.Z) / sampleStep)
+	print("🔍 Total expected samples:", totalExpectedSamples)
+	
 	for x = minPoint.X, maxPoint.X, sampleStep do
 		for y = minPoint.Y, maxPoint.Y, sampleStep do
 			for z = minPoint.Z, maxPoint.Z, sampleStep do
+				sampleCount = sampleCount + 1
+				
+				-- Yield periodically to prevent hanging
+				if sampleCount % 20 == 0 then
+					task.wait()
+					print("🔍 Sampled", sampleCount, "/", totalExpectedSamples, "locations for chambers...")
+				end
+				
 				-- Use Worley noise to identify chamber locations
-				local chamberNoise = Core.getNoise3D(
-					x * noiseConfig.scale,
-					y * noiseConfig.scale,
-					z * noiseConfig.scale,
-					"worley"
-				)
+				local success, chamberNoise = pcall(function()
+					return Core.getNoise3D(
+						x * noiseConfig.scale,
+						y * noiseConfig.scale,
+						z * noiseConfig.scale,
+						"worley"
+					)
+				end)
+				
+				if not success then
+					print("⚠️ Failed to get noise at position", x, y, z, ":", chamberNoise)
+					continue
+				end
 
 				-- Chamber appears where Worley noise is low (cell centers)
 				if chamberNoise < chamberConfig.densityThreshold then
 					local position = Vector3.new(x, y, z)
 
 					-- Determine chamber size with variation
-					local sizeNoise = Core.getNoise3D(x * 0.05, y * 0.05, z * 0.05)
+					local success2, sizeNoise = pcall(function()
+						return Core.getNoise3D(x * 0.05, y * 0.05, z * 0.05)
+					end)
+					
+					if not success2 then
+						print("⚠️ Failed to get size noise:", sizeNoise)
+						continue
+					end
+					
 					local baseSize = chamberConfig.minSize + 
 						(chamberConfig.maxSize - chamberConfig.minSize) * (sizeNoise + 1) / 2
 
-					-- Apply asymmetry
-					local asymmetryX = 1 + (Core.getNoise3D(x * 0.1, y, z) * chamberConfig.asymmetryFactor)
-					local asymmetryY = 1 + (Core.getNoise3D(x, y * 0.1, z) * chamberConfig.heightVariation)
-					local asymmetryZ = 1 + (Core.getNoise3D(x, y, z * 0.1) * chamberConfig.asymmetryFactor)
+					-- Apply asymmetry with error handling
+					local asymmetryX, asymmetryY, asymmetryZ = 1, 1, 1
+					pcall(function()
+						asymmetryX = 1 + (Core.getNoise3D(x * 0.1, y, z) * chamberConfig.asymmetryFactor)
+						asymmetryY = 1 + (Core.getNoise3D(x, y * 0.1, z) * chamberConfig.heightVariation)
+						asymmetryZ = 1 + (Core.getNoise3D(x, y, z * 0.1) * chamberConfig.asymmetryFactor)
+					end)
 
 					local size = Vector3.new(
 						baseSize * asymmetryX,
@@ -74,37 +111,69 @@ local function generateMainChambers(region, config)
 						isMainChamber = true
 					}
 
+					print("🏛️ Generated chamber at", position, "with size", size)
 					table.insert(chambers, chamber)
-					Core.addChamber(chamber)
+					
+					-- Add to Core with error handling
+					pcall(function()
+						Core.addChamber(chamber)
+					end)
+					
 					chamberCount = chamberCount + 1
 
-					-- Carve the chamber in terrain
+					-- Carve the chamber in terrain with error handling
 					local radiusX = size.X / 2
 					local radiusY = size.Y / 2
 					local radiusZ = size.Z / 2
 
+					print("🔨 Carving chamber at", position, "radii:", radiusX, radiusY, radiusZ)
+					
 					-- Sample points within the chamber
 					local step = 2
+					local voxelCount = 0
 					for cx = position.X - radiusX, position.X + radiusX, step do
 						for cy = position.Y - radiusY, position.Y + radiusY, step do
 							for cz = position.Z - radiusZ, position.Z + radiusZ, step do
+								voxelCount = voxelCount + 1
+								
+								-- Yield every 50 voxels to prevent hanging
+								if voxelCount % 50 == 0 then
+									task.wait()
+								end
+								
 								-- Ellipsoid equation
 								local dx = (cx - position.X) / radiusX
 								local dy = (cy - position.Y) / radiusY
 								local dz = (cz - position.Z) / radiusZ
 
 								if dx*dx + dy*dy + dz*dz <= 1 then
-									-- Add some roughness
-									local roughness = Core.getNoise3D(cx * 0.2, cy * 0.2, cz * 0.2) * 0.3
+									-- Add some roughness with error handling
+									local roughness = 0
+									pcall(function()
+										roughness = Core.getNoise3D(cx * 0.2, cy * 0.2, cz * 0.2) * 0.3
+									end)
+									
 									if dx*dx + dy*dy + dz*dz <= 1 + roughness then
-										Core.setVoxel(Vector3.new(cx, cy, cz), true, Enum.Material.Air)
+										-- Set voxel with error handling
+										pcall(function()
+											Core.setVoxel(Vector3.new(cx, cy, cz), true, Enum.Material.Air)
+										end)
 									end
 								end
 							end
 						end
 
-						Core.recordVoxelProcessed()
+						-- Yield after each slice
+						task.wait()
+						
+						if Core.recordVoxelProcessed then
+							pcall(function()
+								Core.recordVoxelProcessed()
+							end)
+						end
 					end
+					
+					print("✅ Carved chamber", chamberCount, "with", voxelCount, "voxels processed")
 				end
 			end
 		end
@@ -339,17 +408,27 @@ end
 
 function Tier1.generate(region, config)
 	print("🥇 === TIER 1: FOUNDATION GENERATION ===")
+	print("🔍 Region:", region.CFrame.Position, "Size:", region.Size)
+	print("🔍 Config enabled - Chambers:", config.Tier1.mainChambers.enabled, 
+		"Passages:", config.Tier1.passages.enabled, 
+		"Shafts:", config.Tier1.verticalShafts.enabled)
 
 	local startTime = tick()
 
 	-- Generate main chambers first
+	print("🏛️ About to generate main chambers...")
 	local chambers = generateMainChambers(region, config)
+	print("🏛️ Main chambers generated:", #chambers)
 
 	-- Connect chambers with passages
+	print("🛤️ About to generate passages...")
 	local passages = generatePassages(chambers, config)
+	print("🛤️ Passages generated:", #passages)
 
 	-- Add vertical shafts to chambers
+	print("⬆️ About to generate vertical shafts...")
 	local shafts = generateVerticalShafts(chambers, config)
+	print("⬆️ Vertical shafts generated:", #shafts)
 
 	local endTime = tick()
 	local generationTime = endTime - startTime
