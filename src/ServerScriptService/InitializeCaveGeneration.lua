@@ -143,9 +143,31 @@ local function validateConfig(config: any): (boolean, string?)
 		return false, "Core.maxGenerationTime must be positive"
 	end
 	
+	if config.Core.yieldInterval and config.Core.yieldInterval <= 0 then
+		return false, "Core.yieldInterval must be positive"
+	end
+	
 	-- Validate noise settings
-	if config.Noise.primary.threshold < -1 or config.Noise.primary.threshold > 1 then
-		return false, "Noise.primary.threshold must be between -1 and 1"
+	if config.Noise.primary and config.Noise.primary.threshold then
+		if config.Noise.primary.threshold < -1 or config.Noise.primary.threshold > 1 then
+			return false, "Noise.primary.threshold must be between -1 and 1"
+		end
+	end
+	
+	-- Validate tier settings
+	for tierName, tierData in pairs({Tier1 = config.Tier1, Tier2 = config.Tier2, Tier3 = config.Tier3}) do
+		if tierData.enabled == nil then
+			tierData.enabled = true -- Default to enabled
+		end
+		
+		-- Validate tier-specific settings
+		if tierName == "Tier1" and tierData.mainChambers then
+			if tierData.mainChambers.minSize and tierData.mainChambers.maxSize then
+				if tierData.mainChambers.minSize >= tierData.mainChambers.maxSize then
+					return false, "Tier1.mainChambers.minSize must be less than maxSize"
+				end
+			end
+		end
 	end
 	
 	log("DEBUG", "Configuration validation passed")
@@ -297,6 +319,38 @@ function InitializeCaveGeneration.generateCave(region: Region3, customConfig: an
 			errorMessage = "Cave generation already in progress",
 			metadata = {}
 		}
+	end
+	
+	-- Validate region size
+	if not region or not region.Size then
+		return {
+			success = false,
+			generationTime = 0,
+			totalVoxels = 0,
+			memoryUsed = 0,
+			features = {chambers = 0, passages = 0, verticalShafts = 0, branches = 0, subChambers = 0, collapseRooms = 0, hiddenPockets = 0, microFeatures = 0},
+			errorMessage = "Invalid region provided",
+			metadata = {}
+		}
+	end
+	
+	local regionSize = region.Size
+	if regionSize.X <= 0 or regionSize.Y <= 0 or regionSize.Z <= 0 then
+		return {
+			success = false,
+			generationTime = 0,
+			totalVoxels = 0,
+			memoryUsed = 0,
+			features = {chambers = 0, passages = 0, verticalShafts = 0, branches = 0, subChambers = 0, collapseRooms = 0, hiddenPockets = 0, microFeatures = 0},
+			errorMessage = "Region size must be positive in all dimensions",
+			metadata = {}
+		}
+	end
+	
+	-- Warn about very large regions
+	local totalVolume = regionSize.X * regionSize.Y * regionSize.Z
+	if totalVolume > 1000000 then -- 1 million cubic studs
+		log("WARNING", string.format("Large region detected (%.0f cubic studs) - generation may take a long time", totalVolume))
 	end
 	
 	isGenerating = true
