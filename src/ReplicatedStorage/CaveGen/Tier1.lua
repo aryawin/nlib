@@ -49,9 +49,8 @@ local function generateMainChambers(region, config)
 			for z = minPoint.Z, maxPoint.Z, sampleStep do
 				sampleCount = sampleCount + 1
 				
-				-- Yield more frequently to prevent hanging
+				-- Progress logging without yielding (let Core.recordVoxelProcessed handle yielding)
 				if sampleCount % 100 == 0 then  -- Reduced frequency from every 10 to every 100
-					task.wait()
 					print("🔍 Sampled", sampleCount, "/", totalExpectedSamples, "locations for chambers...")
 				end
 				
@@ -138,9 +137,11 @@ local function generateMainChambers(region, config)
 							for cz = position.Z - radiusZ, position.Z + radiusZ, step do
 								voxelCount = voxelCount + 1
 								
-								-- Yield every 500 voxels to prevent hanging (reduced frequency)
-								if voxelCount % 500 == 0 then
-									task.wait()
+								-- Record voxel processing (includes yielding logic)
+								if Core.recordVoxelProcessed then
+									pcall(function()
+										Core.recordVoxelProcessed()
+									end)
 								end
 								
 								-- Ellipsoid equation
@@ -165,9 +166,7 @@ local function generateMainChambers(region, config)
 							end
 						end
 
-						-- Yield after each slice
-						task.wait()
-						
+						-- Record voxel processing instead of direct yielding
 						if Core.recordVoxelProcessed then
 							pcall(function()
 								Core.recordVoxelProcessed()
