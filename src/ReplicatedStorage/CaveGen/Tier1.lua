@@ -33,9 +33,10 @@ local function generateMainChambers(region, config)
 	print("🔍 Expected iterations - X:", math.ceil((maxPoint.X - minPoint.X) / 12), 
 		"Y:", math.ceil((maxPoint.Y - minPoint.Y) / 12), 
 		"Z:", math.ceil((maxPoint.Z - minPoint.Z) / 12))
+	print("🔍 Chamber detection threshold:", chamberConfig.densityThreshold)
 
-	-- Sample points for potential chambers (optimized spacing)
-	local sampleStep = 18 -- studs between samples (increased for fewer samples)
+	-- Sample points for potential chambers (reduced spacing for better coverage)
+	local sampleStep = 12 -- studs between samples (reduced to find more chambers)
 	local chamberCount = 0
 
 	local sampleCount = 0
@@ -73,6 +74,8 @@ local function generateMainChambers(region, config)
 				-- Chamber appears where Worley noise is low (cell centers)
 				if chamberNoise < chamberConfig.densityThreshold then
 					local position = Vector3.new(x, y, z)
+
+					print("🎯 Found chamber location at", position, "with noise value", chamberNoise, "< threshold", chamberConfig.densityThreshold)
 
 					-- Determine chamber size with variation
 					local success2, sizeNoise = pcall(function()
@@ -129,8 +132,10 @@ local function generateMainChambers(region, config)
 					print("🔨 Carving chamber at", position, "radii:", radiusX, radiusY, radiusZ)
 					
 					-- Sample points within the chamber (optimized step size)
-					local step = math.max(2, math.min(radiusX, radiusY, radiusZ) / 8) -- adaptive step size
+					local step = math.max(1, math.min(radiusX, radiusY, radiusZ) / 12) -- smaller step for better coverage
 					local voxelCount = 0
+					local carvedCount = 0
+					print("🔨 Carving chamber with step size", step, "radii:", radiusX, radiusY, radiusZ)
 					for cx = position.X - radiusX, position.X + radiusX, step do
 						for cy = position.Y - radiusY, position.Y + radiusY, step do
 							for cz = position.Z - radiusZ, position.Z + radiusZ, step do
@@ -157,6 +162,7 @@ local function generateMainChambers(region, config)
 										-- Set voxel with error handling
 										pcall(function()
 											Core.setVoxel(Vector3.new(cx, cy, cz), true, Enum.Material.Air)
+											carvedCount = carvedCount + 1
 										end)
 									end
 								end
@@ -173,7 +179,7 @@ local function generateMainChambers(region, config)
 						end
 					end
 					
-					print("✅ Carved chamber", chamberCount, "with", voxelCount, "voxels processed")
+					print("✅ Carved chamber", chamberCount, "with", voxelCount, "voxels processed,", carvedCount, "voxels carved as air")
 				end
 			end
 		end

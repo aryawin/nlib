@@ -322,8 +322,8 @@ function Core.initializeTerrainBuffer(region: Region3): ()
 		voxelData[x] = table.create(voxelsY)
 		voxelMaterials[x] = table.create(voxelsY)
 		for y = 1, voxelsY do
-			voxelData[x][y] = table.create(voxelsZ, 0) -- 0 = air, 1 = solid (start with air for cave carving)
-			voxelMaterials[x][y] = table.create(voxelsZ, config.Core.materialAir)
+			voxelData[x][y] = table.create(voxelsZ, 1) -- 0 = air, 1 = solid (start with solid rock for cave carving)
+			voxelMaterials[x][y] = table.create(voxelsZ, config.Core.materialRock)
 		end
 	end
 
@@ -332,7 +332,7 @@ function Core.initializeTerrainBuffer(region: Region3): ()
 		resolution = resolution,
 		dimensions = string.format("%dx%dx%d", voxelsX, voxelsY, voxelsZ),
 		regionSize = string.format("%.1fx%.1fx%.1f", size.X, size.Y, size.Z),
-		startState = "air (0) for cave carving"
+		startState = "solid rock (1) for cave carving"
 	})
 end
 
@@ -348,9 +348,15 @@ function Core.setVoxel(position: Vector3, isAir: boolean, material: Enum.Materia
 		z >= 1 and z <= #voxelData[1][1] then
 
 		-- Set occupancy: 0 = air, 1 = solid
-		-- For caves: we keep air (0) and only set solid rock (1) where needed for walls/floor
+		-- For caves: we carve air (0) into solid terrain (1)
+		local oldValue = voxelData[x][y][z]
 		voxelData[x][y][z] = if isAir then 0 else 1
 		voxelMaterials[x][y][z] = material or (if isAir then config.Core.materialAir else config.Core.materialRock)
+		
+		-- Debug: track voxel changes
+		if oldValue ~= voxelData[x][y][z] and isAir then
+			caveData.metadata.totalVoxels = (caveData.metadata.totalVoxels or 0) + 1
+		end
 	end
 end
 

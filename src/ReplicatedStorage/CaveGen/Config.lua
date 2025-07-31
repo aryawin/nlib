@@ -75,7 +75,7 @@ Config.Tier1 = {
 		enabled = true,
 		minSize = 15, -- studs (increased for larger caves)
 		maxSize = 45, -- increased for larger caves
-		densityThreshold = 0.08, -- Lower = more chambers (reduced for fewer, larger chambers)
+		densityThreshold = 0.3, -- Lower = more chambers (increased significantly to ensure chambers generate)
 		asymmetryFactor = 0.3,
 		heightVariation = 0.4
 	},
@@ -385,9 +385,9 @@ Config.Region = {
 	activePreset = nil, -- "TINY", "SMALL", "MEDIUM", "LARGE", "GIGANTIC", etc.
 	customRegion = nil, -- {size = Vector3, center = Vector3} - highest priority
 	
-	-- Default fallback settings
-	defaultSize = Vector3.new(100, 50, 100),
-	defaultCenter = Vector3.new(0, -25, 0),
+	-- Default fallback settings (smaller for easier debugging)
+	defaultSize = Vector3.new(60, 30, 60),
+	defaultCenter = Vector3.new(0, -15, 0),
 	
 	-- Region presets
 	presets = {
