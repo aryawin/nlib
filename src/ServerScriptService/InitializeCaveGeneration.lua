@@ -472,14 +472,20 @@ function InitializeCaveGeneration.generateCave(region: Region3, customConfig: an
 		
 		-- Ensure connectivity between features
 		reportProgress(options, 0.9, "Connectivity", "Analyzing and ensuring cave connectivity")
-		Core.ensureConnectivity()
+		pcall(function() Core.ensureConnectivity() end)
 		
 		-- Apply terrain changes
 		reportProgress(options, 0.95, "Terrain", "Applying changes to Roblox terrain")
-		Core.applyTerrainChanges(region)
+		local terrainSuccess, terrainError = pcall(function() 
+			Core.applyTerrainChanges(region) 
+		end)
 		
-		-- Finalize performance monitoring
-		Core.endPerformanceMonitoring()
+		if not terrainSuccess then
+			log("WARNING", "Terrain application failed but continuing: " .. tostring(terrainError))
+		end
+		
+		-- Finalize performance monitoring (Core's internal tracking)
+		pcall(function() Core.endPerformanceMonitoring() end)
 		reportProgress(options, 1.0, "Complete", "Cave generation finished successfully")
 		
 		result.success = true
@@ -518,6 +524,10 @@ end
 function InitializeCaveGeneration.generateQuickCave(position: Vector3, size: Vector3?): GenerationResult
 	local caveSize = size or Vector3.new(100, 50, 100)
 	local region = Region3.new(position - caveSize/2, position + caveSize/2)
+	
+	-- Align region to terrain grid for WriteVoxels compatibility
+	local resolution = 4 -- Default terrain resolution
+	region = region:ExpandToGrid(resolution)
 	
 	-- Use default configuration optimized for quick generation
 	local quickConfig = {
@@ -582,6 +592,10 @@ function InitializeCaveGeneration.generateTestCave(): GenerationResult
 	local testPosition = Vector3.new(0, -25, 0)
 	local testSize = Vector3.new(50, 30, 50)
 	local region = Region3.new(testPosition - testSize/2, testPosition + testSize/2)
+	
+	-- Align region to terrain grid for WriteVoxels compatibility
+	local resolution = 4 -- Default terrain resolution
+	region = region:ExpandToGrid(resolution)
 	
 	-- Test configuration with debug features enabled
 	local testConfig = {

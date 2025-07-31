@@ -342,6 +342,29 @@ function Core.applyTerrainChanges(region: Region3): ()
 
 	-- Apply via WriteVoxels
 	local success, err = pcall(function()
+		-- Validate array dimensions
+		if not voxelData or #voxelData == 0 then
+			error("voxelData is empty")
+		end
+		if not voxelMaterials or #voxelMaterials == 0 then
+			error("voxelMaterials is empty")
+		end
+		
+		-- Check dimensions match
+		local expectedX = math.ceil(region.Size.X / resolution)
+		local expectedY = math.ceil(region.Size.Y / resolution)
+		local expectedZ = math.ceil(region.Size.Z / resolution)
+		
+		if #voxelData ~= expectedX then
+			error(string.format("X dimension mismatch: expected %d, got %d", expectedX, #voxelData))
+		end
+		if #voxelData[1] ~= expectedY then
+			error(string.format("Y dimension mismatch: expected %d, got %d", expectedY, #voxelData[1]))
+		end
+		if #voxelData[1][1] ~= expectedZ then
+			error(string.format("Z dimension mismatch: expected %d, got %d", expectedZ, #voxelData[1][1]))
+		end
+		
 		workspace.Terrain:WriteVoxels(
 			region,
 			resolution,

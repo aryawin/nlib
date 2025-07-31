@@ -115,7 +115,7 @@ local function generateBranches(passages, config)
 						end
 					end
 
-					Core.recordVoxelProcessed()
+					if Core.recordVoxelProcessed then Core.recordVoxelProcessed() end
 				end
 
 				-- Seal dead end if needed
@@ -221,7 +221,7 @@ local function generateSubChambers(mainChambers, config)
 							end
 						end
 					end
-					Core.recordVoxelProcessed()
+					if Core.recordVoxelProcessed then Core.recordVoxelProcessed() end
 				end
 
 				-- Create connecting tunnel
@@ -319,7 +319,7 @@ local function generateCollapseRooms(region, config)
 								end
 							end
 						end
-						Core.recordVoxelProcessed()
+						if Core.recordVoxelProcessed then Core.recordVoxelProcessed() end
 					end
 				end
 			end
@@ -439,7 +439,7 @@ local function generateTectonicIntersections(region, config)
 								end
 							end
 						end
-						Core.recordVoxelProcessed()
+						if Core.recordVoxelProcessed then Core.recordVoxelProcessed() end
 					end
 
 					intersectionCount = intersectionCount + 1

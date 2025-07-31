@@ -103,7 +103,9 @@ local function generateMainChambers(region, config)
 							end
 						end
 
-						Core.recordVoxelProcessed()
+						if Core.recordVoxelProcessed then
+							Core.recordVoxelProcessed()
+						end
 					end
 				end
 			end

@@ -117,7 +117,7 @@ local function generateFractureVeins(region, config)
 								Core.setVoxel(pos + offset, true, Enum.Material.Air)
 							end
 						end
-						Core.recordVoxelProcessed()
+						if Core.recordVoxelProcessed then Core.recordVoxelProcessed() end
 					end
 				end
 			end
@@ -224,7 +224,7 @@ local function generatePinchPoints(passages, config)
 					end
 				end
 
-				Core.recordVoxelProcessed()
+				if Core.recordVoxelProcessed then Core.recordVoxelProcessed() end
 			end
 		end
 	end
@@ -286,7 +286,7 @@ local function generateSeamLayers(region, config)
 						Core.setVoxel(pos, true, Enum.Material.Air)
 					end
 
-					Core.recordVoxelProcessed()
+					if Core.recordVoxelProcessed then Core.recordVoxelProcessed() end
 				end
 			end
 		end
@@ -365,7 +365,7 @@ local function generateShelfLayers(chambers, config)
 					end
 				end
 
-				Core.recordVoxelProcessed()
+				if Core.recordVoxelProcessed then Core.recordVoxelProcessed() end
 			end
 		end
 	end
@@ -437,7 +437,7 @@ local function generatePlateGaps(region, config)
 						Core.setVoxel(gapPos + Vector3.new(0, 0, w), true, Enum.Material.Air)
 					end
 
-					Core.recordVoxelProcessed()
+					if Core.recordVoxelProcessed then Core.recordVoxelProcessed() end
 				end
 			end
 		end
@@ -507,7 +507,7 @@ local function generatePressureFunnels(chambers, config)
 					end
 				end
 
-				Core.recordVoxelProcessed()
+				if Core.recordVoxelProcessed then Core.recordVoxelProcessed() end
 			end
 		end
 	end
@@ -593,7 +593,7 @@ local function generateConcretionDomes(chambers, config)
 					end
 				end
 
-				Core.recordVoxelProcessed()
+				if Core.recordVoxelProcessed then Core.recordVoxelProcessed() end
 			end
 		end
 	end
