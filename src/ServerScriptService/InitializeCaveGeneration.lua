@@ -39,6 +39,10 @@ local GENERATION_VERSION = "1.0.0"
 local MAX_TOTAL_GENERATION_TIME = 300 -- 5 minutes absolute maximum
 local DEFAULT_PROGRESS_INTERVAL = 5 -- seconds between progress reports
 
+-- Auto-generation configuration
+local AUTO_GENERATE_ON_START = true -- Set to false to disable auto-generation
+local AUTO_GENERATION_DELAY = 2 -- seconds to wait before auto-generating
+
 export type GenerationOptions = {
 	enableTier1: boolean?,
 	enableTier2: boolean?,
@@ -677,5 +681,50 @@ if not InitializeCaveGeneration.validateModules() then
 end
 
 log("INFO", "InitializeCaveGeneration v" .. GENERATION_VERSION .. " loaded successfully")
+
+-- ================================================================================================
+--                                    AUTO-GENERATION ON START
+-- ================================================================================================
+
+-- Function to handle auto-generation
+local function performAutoGeneration()
+	if not AUTO_GENERATE_ON_START then
+		log("INFO", "Auto-generation disabled")
+		return
+	end
+	
+	log("INFO", "Starting auto-generation in " .. AUTO_GENERATION_DELAY .. " seconds...")
+	
+	-- Wait for the specified delay
+	task.wait(AUTO_GENERATION_DELAY)
+	
+	-- Check if all modules are still available
+	if not InitializeCaveGeneration.validateModules() then
+		log("ERROR", "Auto-generation cancelled: Module validation failed")
+		return
+	end
+	
+	log("INFO", "Performing auto-generation of test cave...")
+	
+	-- Generate a test cave with progress reporting
+	local success, result = pcall(function()
+		return InitializeCaveGeneration.generateTestCave()
+	end)
+	
+	if success and result.success then
+		log("INFO", string.format("Auto-generation completed successfully in %.2f seconds", result.generationTime))
+		log("INFO", string.format("Generated cave with %d chambers, %d passages, and %d total features", 
+			result.features.chambers or 0, 
+			result.features.passages or 0, 
+			(result.features.chambers or 0) + (result.features.passages or 0) + (result.features.verticalShafts or 0)))
+	elseif success then
+		log("WARNING", "Auto-generation completed but with errors: " .. (result.error or "Unknown error"))
+	else
+		log("ERROR", "Auto-generation failed: " .. tostring(result))
+	end
+end
+
+-- Start auto-generation in a separate thread to avoid blocking script initialization
+task.spawn(performAutoGeneration)
 
 return InitializeCaveGeneration
