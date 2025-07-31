@@ -34,8 +34,8 @@ local function generateMainChambers(region, config)
 		"Y:", math.ceil((maxPoint.Y - minPoint.Y) / 12), 
 		"Z:", math.ceil((maxPoint.Z - minPoint.Z) / 12))
 
-	-- Sample points for potential chambers
-	local sampleStep = 12 -- studs between samples
+	-- Sample points for potential chambers (optimized spacing)
+	local sampleStep = 18 -- studs between samples (increased for fewer samples)
 	local chamberCount = 0
 
 	local sampleCount = 0
@@ -49,8 +49,8 @@ local function generateMainChambers(region, config)
 			for z = minPoint.Z, maxPoint.Z, sampleStep do
 				sampleCount = sampleCount + 1
 				
-				-- Yield periodically to prevent hanging
-				if sampleCount % 20 == 0 then
+				-- Yield more frequently to prevent hanging
+				if sampleCount % 10 == 0 then
 					task.wait()
 					print("🔍 Sampled", sampleCount, "/", totalExpectedSamples, "locations for chambers...")
 				end
@@ -128,16 +128,16 @@ local function generateMainChambers(region, config)
 
 					print("🔨 Carving chamber at", position, "radii:", radiusX, radiusY, radiusZ)
 					
-					-- Sample points within the chamber
-					local step = 2
+					-- Sample points within the chamber (optimized step size)
+					local step = math.max(2, math.min(radiusX, radiusY, radiusZ) / 8) -- adaptive step size
 					local voxelCount = 0
 					for cx = position.X - radiusX, position.X + radiusX, step do
 						for cy = position.Y - radiusY, position.Y + radiusY, step do
 							for cz = position.Z - radiusZ, position.Z + radiusZ, step do
 								voxelCount = voxelCount + 1
 								
-								-- Yield every 50 voxels to prevent hanging
-								if voxelCount % 50 == 0 then
+								-- Yield every 25 voxels to prevent hanging (more frequent)
+								if voxelCount % 25 == 0 then
 									task.wait()
 								end
 								
@@ -196,18 +196,19 @@ local function generatePassages(chambers, config)
 	print("🌉 Generating passages between chambers...")
 	local passages = {}
 	local passageCount = 0
-	local maxConnections = config.Tier1.passages.maxConnections or 3
-	local timeoutPerPassage = config.Tier1.passages.timeoutPerPassage or 5
+	local passageConfig = config.Tier1.passages
+	local maxConnections = passageConfig.maxConnections or 3
+	local timeoutPerPassage = passageConfig.timeoutPerPassage or 3
 
 	local startTime = tick()
 
 	for i, chamber1 in ipairs(chambers) do
-		if passageCount >= 200 then -- Hard limit
+		if passageCount >= 50 then -- Reduced limit for better performance
 			print("⚠️ Reached maximum passages limit")
 			break
 		end
 
-		if tick() - startTime > 120 then -- 2 minute timeout for all passages
+		if tick() - startTime > 60 then -- 1 minute timeout for all passages
 			print("⚠️ Passage generation timeout")
 			break
 		end
@@ -219,18 +220,18 @@ local function generatePassages(chambers, config)
 				local distance = (chamber1.position - chamber2.position).Magnitude
 
 				-- Only connect nearby chambers
-				if distance < 50 and distance > 10 then
+				if distance < 80 and distance > 15 then -- increased range for better connectivity
 					local passageStart = tick()
 
 					-- Simple straight-line passage with timeout
 					local success, passage = pcall(function()
 						local passageId = Core.generateId("passage")
-						local width = config.Tier1.passages.width or 4
+						local width = passageConfig.minWidth + math.random() * (passageConfig.maxWidth - passageConfig.minWidth)
 
-						-- Create simple straight path
+						-- Create optimized straight path
 						local direction = (chamber2.position - chamber1.position).Unit
 						local pathLength = distance
-						local stepSize = 2
+						local stepSize = 4 -- increased step size for performance
 						local path = {}
 
 						for step = 0, pathLength, stepSize do
@@ -241,48 +242,50 @@ local function generatePassages(chambers, config)
 							local pathPos = chamber1.position + direction * step
 							table.insert(path, pathPos)
 
-							-- Yield occasionally
-							if #path % 10 == 0 then
+							-- Less frequent yielding for performance
+							if #path % 20 == 0 then
 								wait()
 							end
 						end
 
 						local passageData = {
 							id = passageId,
+							startPos = chamber1.position,
+							endPos = chamber2.position,
 							path = path,
 							width = width,
-							chamber1 = chamber1.id,
-							chamber2 = chamber2.id,
-							length = pathLength
+							connections = {chamber1.id, chamber2.id}
 						}
 
-						-- Carve the passage
-						for _, pos in ipairs(path) do
-							for r = 0, width/2, 1 do
-								for angle = 0, 2*math.pi, math.pi/4 do
-									local offset = Vector3.new(
-										math.cos(angle) * r,
-										0,
-										math.sin(angle) * r
-									)
+						-- Optimized passage carving with larger steps
+						for i, pos in ipairs(path) do
+							if i % 2 == 0 then -- Skip every other path point for performance
+								local radius = width / 2
+								
+								-- Simpler cylindrical carving
+								for r = 0, radius, 2 do -- larger step for radius
+									for angle = 0, 2*math.pi, math.pi/3 do -- fewer angles
+										local offset = Vector3.new(
+											math.cos(angle) * r,
+											0,
+											math.sin(angle) * r
+										)
 
-									for h = -width/2, width/2, 1 do
-										local voxelPos = pos + offset + Vector3.new(0, h, 0)
-										Core.setVoxel(voxelPos, true, Enum.Material.Air)
+										for h = -radius, radius, 2 do -- larger step for height
+											local voxelPos = pos + offset + Vector3.new(0, h, 0)
+											Core.setVoxel(voxelPos, true, Enum.Material.Air)
+										end
 									end
 								end
 							end
 
-							-- Yield more often during carving
-							wait()
+							-- Yield less frequently for performance
+							if i % 10 == 0 then
+								wait()
+							end
 						end
 
-						Core.addFeature({
-							id = passageId,
-							type = "passage",
-							position = chamber1.position,
-							properties = passageData
-						})
+						Core.addPassage(passageData)
 
 						return passageData
 					end)
@@ -292,7 +295,7 @@ local function generatePassages(chambers, config)
 						passageCount = passageCount + 1
 						connections = connections + 1
 
-						if passageCount % 10 == 0 then
+						if passageCount % 5 == 0 then
 							print("📊 Generated", passageCount, "passages...")
 						end
 					else

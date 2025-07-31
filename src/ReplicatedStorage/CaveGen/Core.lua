@@ -468,8 +468,9 @@ end
 function Core.recordVoxelProcessed(): ()
 	performanceData.voxelsProcessed = performanceData.voxelsProcessed + 1
 
-	-- Check if we need to yield
-	if performanceData.voxelsProcessed % config.Core.yieldInterval == 0 then
+	-- Check if we need to yield (using optimized interval)
+	local yieldInterval = config.Core.yieldInterval or 50
+	if performanceData.voxelsProcessed % yieldInterval == 0 then
 		task.wait()
 	end
 end

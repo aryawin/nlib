@@ -14,9 +14,9 @@ local Config = {}
 Config.Core = {
 	-- Generation Settings
 	seed = nil, -- nil = random seed, number = specific seed for reproducible generation
-	chunkSize = 526, -- Size of processing chunks (studs)
+	chunkSize = 256, -- Size of processing chunks (studs) - optimized for performance
 	maxGenerationTime = 30.0, -- Target max generation time in seconds
-	yieldInterval = 100, -- Yield every N voxels processed
+	yieldInterval = 50, -- Yield every N voxels processed - more frequent for stability
 
 	-- Terrain Settings
 	terrainResolution = 4, -- Terrain voxel resolution
@@ -24,7 +24,7 @@ Config.Core = {
 	materialRock = Enum.Material.Rock,
 
 	-- Logging Settings
-	logLevel = "DEBUG", -- "DEBUG", "INFO", "WARNING", "ERROR"
+	logLevel = "INFO", -- "DEBUG", "INFO", "WARNING", "ERROR" - reduced verbosity
 	enablePerformanceLogging = true,
 	enableDetailedLogging = false
 }
@@ -73,9 +73,9 @@ Config.Tier1 = {
 	-- Main Chambers
 	mainChambers = {
 		enabled = true,
-		minSize = 8, -- studs
-		maxSize = 24,
-		densityThreshold = 0.15, -- Lower = more chambers
+		minSize = 15, -- studs (increased for larger caves)
+		maxSize = 45, -- increased for larger caves
+		densityThreshold = 0.08, -- Lower = more chambers (reduced for fewer, larger chambers)
 		asymmetryFactor = 0.3,
 		heightVariation = 0.4
 	},
@@ -83,12 +83,14 @@ Config.Tier1 = {
 	-- Passages
 	passages = {
 		enabled = true,
-		minWidth = 3,
-		maxWidth = 8,
+		minWidth = 4, -- increased for better connectivity
+		maxWidth = 12, -- increased for larger passages
 		curvature = 0.25, -- 0 = straight, 1 = very curved
-		pathfindingSteps = 50,
-		smoothingPasses = 3,
-		branchProbability = 0.15
+		pathfindingSteps = 25, -- reduced for performance
+		smoothingPasses = 2, -- reduced for performance
+		branchProbability = 0.15,
+		maxConnections = 3, -- limit connections per chamber
+		timeoutPerPassage = 3 -- reduced timeout for faster generation
 	},
 
 	-- Vertical Shafts
@@ -312,27 +314,66 @@ Config.Connectivity = {
 -- ================================================================================================
 
 Config.Performance = {
-	-- Relaxed performance targets (<30 seconds instead of <1 second)
-	maxGenerationTime = 60, -- Maximum total generation time in seconds
-	targetVoxelsPerSecond = 50000, -- Target voxel processing rate
+	-- Optimized performance targets for faster generation
+	maxGenerationTime = 30, -- Target maximum total generation time in seconds
+	targetVoxelsPerSecond = 75000, -- Increased target voxel processing rate
 	
 	-- Caching settings
 	enableCaching = true,
-	cacheSize = 1000,
-
-	-- Chunked processing
-	chunkSize = 526, -- Voxels per chunk
-	maxChunksPerFrame = 10, -- Reduced for stability
-	yieldEveryNChunks = 5, -- Yield more frequently
-
+	cacheSize = 2000, -- increased cache size
+	
+	-- Chunked processing - optimized for better performance
+	chunkSize = 256, -- Reduced chunk size for better yielding
+	maxChunksPerFrame = 5, -- Reduced for stability
+	yieldEveryNChunks = 2, -- Yield more frequently for smoother generation
+	
 	-- Memory management
-	maxMemoryUsage = 4000, -- MB
-	garbageCollectInterval = 100, -- chunks
-
+	maxMemoryUsage = 6000, -- MB - increased for larger caves
+	garbageCollectInterval = 50, -- chunks - more frequent cleanup
+	
 	-- Threading
 	useMultipleThreads = true,
-	maxConcurrentOperations = 3, -- Reduced
-	threadTimeout = 15, -- seconds per thread
+	maxConcurrentOperations = 2, -- Reduced for stability
+	threadTimeout = 10, -- seconds per thread
+}
+
+-- ================================================================================================
+--                                    CAVE PRESETS
+-- ================================================================================================
+
+Config.Presets = {
+	-- Quick small caves for testing
+	small = {
+		Core = { chunkSize = 128, maxGenerationTime = 15 },
+		Tier1 = {
+			mainChambers = { densityThreshold = 0.12, minSize = 10, maxSize = 25 },
+			passages = { minWidth = 3, maxWidth = 8, pathfindingSteps = 15 }
+		},
+		Tier2 = { enabled = false },
+		Tier3 = { enabled = false }
+	},
+	
+	-- Medium interconnected cave systems
+	medium = {
+		Core = { chunkSize = 256, maxGenerationTime = 30 },
+		Tier1 = {
+			mainChambers = { densityThreshold = 0.08, minSize = 15, maxSize = 45 },
+			passages = { minWidth = 4, maxWidth = 12, pathfindingSteps = 25 }
+		},
+		Tier2 = { enabled = true },
+		Tier3 = { enabled = false }
+	},
+	
+	-- Large complex cave networks with all features
+	large = {
+		Core = { chunkSize = 512, maxGenerationTime = 60 },
+		Tier1 = {
+			mainChambers = { densityThreshold = 0.06, minSize = 20, maxSize = 60 },
+			passages = { minWidth = 6, maxWidth = 16, pathfindingSteps = 35 }
+		},
+		Tier2 = { enabled = true },
+		Tier3 = { enabled = true }
+	}
 }
 
 -- ================================================================================================
@@ -355,6 +396,75 @@ Config.Debug = {
 	printGenerationStats = true,
 	saveDebugData = false
 }
+
+-- ================================================================================================
+--                                    CONFIGURATION UTILITIES
+-- ================================================================================================
+
+-- Apply a preset configuration
+function Config.applyPreset(presetName)
+	local preset = Config.Presets[presetName]
+	if not preset then
+		warn("Unknown preset:", presetName)
+		return false
+	end
+	
+	print("🎛️ Applying preset configuration:", presetName)
+	
+	-- Deep merge preset with existing config
+	for sectionName, sectionConfig in pairs(preset) do
+		if Config[sectionName] then
+			for key, value in pairs(sectionConfig) do
+				if type(value) == "table" and type(Config[sectionName][key]) == "table" then
+					-- Merge sub-tables
+					for subKey, subValue in pairs(value) do
+						Config[sectionName][key][subKey] = subValue
+					end
+				else
+					Config[sectionName][key] = value
+				end
+			end
+		end
+	end
+	
+	print("✅ Applied preset:", presetName)
+	return true
+end
+
+-- Get a merged configuration with a preset
+function Config.withPreset(presetName)
+	local baseConfig = Config
+	local preset = Config.Presets[presetName]
+	
+	if not preset then
+		warn("Unknown preset:", presetName)
+		return baseConfig
+	end
+	
+	-- Create a deep copy and merge
+	local merged = {}
+	for k, v in pairs(baseConfig) do
+		if type(v) == "table" then
+			merged[k] = {}
+			for k2, v2 in pairs(v) do
+				merged[k][k2] = v2
+			end
+		else
+			merged[k] = v
+		end
+	end
+	
+	-- Apply preset overrides
+	for sectionName, sectionConfig in pairs(preset) do
+		if merged[sectionName] then
+			for key, value in pairs(sectionConfig) do
+				merged[sectionName][key] = value
+			end
+		end
+	end
+	
+	return merged
+end
 
 -- ================================================================================================
 --                                    VALIDATION
