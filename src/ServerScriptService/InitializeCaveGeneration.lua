@@ -295,22 +295,6 @@ local function runGenerationTier(tierFunc: (any, any) -> any, tierName: string, 
 	local timeout = (options and options.timeout) or config.Core.maxGenerationTime or 60
 	log("DEBUG", string.format("Using timeout of %d seconds for %s", timeout, tierName))
 	
-	-- For debugging: try direct execution first to see if the timeout mechanism is the issue
-	log("DEBUG", "Attempting direct execution (no timeout) for debugging...")
-	local directSuccess, directResult = pcall(function()
-		return tierFunc(region, config)
-	end)
-	
-	if directSuccess then
-		log("DEBUG", "Direct execution succeeded - issue is likely in timeout mechanism")
-		return true, directResult
-	else
-		log("ERROR", "Direct execution failed:", tostring(directResult))
-		return false, directResult
-	end
-	
-	-- Original timeout-based execution (commented out for debugging)
-	--[[
 	local success, result = executeWithTimeout(function()
 		log("DEBUG", string.format("Executing %s generation function...", tierName))
 		return tierFunc(region, config)
@@ -323,7 +307,6 @@ local function runGenerationTier(tierFunc: (any, any) -> any, tierName: string, 
 		log("ERROR", string.format("%s generation failed: %s", tierName, tostring(result)))
 		return false, result
 	end
-	--]]
 end
 
 -- ================================================================================================

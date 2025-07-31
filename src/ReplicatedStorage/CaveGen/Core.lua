@@ -322,7 +322,7 @@ function Core.initializeTerrainBuffer(region: Region3): ()
 		voxelData[x] = table.create(voxelsY)
 		voxelMaterials[x] = table.create(voxelsY)
 		for y = 1, voxelsY do
-			voxelData[x][y] = table.create(voxelsZ, 1) -- 0 = air, 1 = solid (start with solid rock)
+			voxelData[x][y] = table.create(voxelsZ, 1) -- 0 = air, 1 = solid (start with solid rock for cave carving)
 			voxelMaterials[x][y] = table.create(voxelsZ, config.Core.materialRock)
 		end
 	end
@@ -344,6 +344,7 @@ function Core.setVoxel(position: Vector3, isAir: boolean, material: Enum.Materia
 		y >= 1 and y <= #voxelData[1] and 
 		z >= 1 and z <= #voxelData[1][1] then
 
+		-- For caves: set to 1 for solid rock, 0 for air (WriteVoxels occupancy format)
 		voxelData[x][y][z] = if isAir then 0 else 1
 		voxelMaterials[x][y][z] = material or (if isAir then config.Core.materialAir else config.Core.materialRock)
 	end
@@ -357,6 +358,28 @@ function Core.applyTerrainChanges(region: Region3): ()
 
 	local startTime = tick()
 	local resolution = config.Core.terrainResolution or 4
+
+	-- Debug: Count air and solid voxels
+	local airCount = 0
+	local solidCount = 0
+	for x = 1, #voxelData do
+		for y = 1, #voxelData[x] do
+			for z = 1, #voxelData[x][y] do
+				if voxelData[x][y][z] == 0 then
+					airCount = airCount + 1
+				else
+					solidCount = solidCount + 1
+				end
+			end
+		end
+	end
+	
+	log("INFO", "Voxel counts before applying terrain", {
+		air = airCount,
+		solid = solidCount,
+		total = airCount + solidCount,
+		airPercentage = string.format("%.1f%%", (airCount / (airCount + solidCount)) * 100)
+	})
 
 	-- Convert to Roblox terrain format
 	local minPoint = region.CFrame.Position - region.Size/2
@@ -398,7 +421,9 @@ function Core.applyTerrainChanges(region: Region3): ()
 		local endTime = tick()
 		log("INFO", "Terrain changes applied successfully", {
 			time = string.format("%.3f", endTime - startTime),
-			voxels = #voxelData * #voxelData[1] * #voxelData[1][1]
+			voxels = #voxelData * #voxelData[1] * #voxelData[1][1],
+			air = airCount,
+			solid = solidCount
 		})
 	else
 		log("ERROR", "Failed to apply terrain changes", err)
@@ -469,7 +494,7 @@ function Core.recordVoxelProcessed(): ()
 	performanceData.voxelsProcessed = performanceData.voxelsProcessed + 1
 
 	-- Check if we need to yield (using optimized interval)
-	local yieldInterval = config.Core.yieldInterval or 50
+	local yieldInterval = config.Core.yieldInterval or 500  -- Reduced frequency for better performance
 	if performanceData.voxelsProcessed % yieldInterval == 0 then
 		task.wait()
 	end

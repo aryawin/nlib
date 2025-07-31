@@ -50,7 +50,7 @@ local function generateMainChambers(region, config)
 				sampleCount = sampleCount + 1
 				
 				-- Yield more frequently to prevent hanging
-				if sampleCount % 10 == 0 then
+				if sampleCount % 100 == 0 then  -- Reduced frequency from every 10 to every 100
 					task.wait()
 					print("🔍 Sampled", sampleCount, "/", totalExpectedSamples, "locations for chambers...")
 				end
@@ -73,6 +73,8 @@ local function generateMainChambers(region, config)
 				-- Chamber appears where Worley noise is low (cell centers)
 				if chamberNoise < chamberConfig.densityThreshold then
 					local position = Vector3.new(x, y, z)
+					
+					print("🏛️ Chamber detected at", position, "with noise value", chamberNoise, "< threshold", chamberConfig.densityThreshold)
 
 					-- Determine chamber size with variation
 					local success2, sizeNoise = pcall(function()
@@ -136,8 +138,8 @@ local function generateMainChambers(region, config)
 							for cz = position.Z - radiusZ, position.Z + radiusZ, step do
 								voxelCount = voxelCount + 1
 								
-								-- Yield every 25 voxels to prevent hanging (more frequent)
-								if voxelCount % 25 == 0 then
+								-- Yield every 500 voxels to prevent hanging (reduced frequency)
+								if voxelCount % 500 == 0 then
 									task.wait()
 								end
 								
@@ -243,7 +245,7 @@ local function generatePassages(chambers, config)
 							table.insert(path, pathPos)
 
 							-- Less frequent yielding for performance
-							if #path % 20 == 0 then
+							if #path % 50 == 0 then  -- Reduced frequency
 								wait()
 							end
 						end
@@ -280,7 +282,7 @@ local function generatePassages(chambers, config)
 							end
 
 							-- Yield less frequently for performance
-							if i % 10 == 0 then
+							if i % 50 == 0 then  -- Reduced frequency
 								wait()
 							end
 						end
