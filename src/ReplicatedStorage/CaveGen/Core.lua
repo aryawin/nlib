@@ -468,8 +468,9 @@ end
 function Core.recordVoxelProcessed(): ()
 	performanceData.voxelsProcessed = performanceData.voxelsProcessed + 1
 
-	-- Check if we need to yield
-	if performanceData.voxelsProcessed % config.Core.yieldInterval == 0 then
+	-- Check if we need to yield (using optimized interval)
+	local yieldInterval = config.Core.yieldInterval or 50
+	if performanceData.voxelsProcessed % yieldInterval == 0 then
 		task.wait()
 	end
 end
@@ -550,69 +551,163 @@ function Core.ensureConnectivity(): ()
 
 	if #mainChambers <= 1 then return end
 
-	-- Check connectivity between chambers
-	local connected = {}
-	local isolated = {}
-
+	-- Build connectivity graph
+	local connectionGraph = {}
 	for i, chamber in ipairs(mainChambers) do
-		local hasConnection = false
-		for _, passage in ipairs(caveData.passages) do
-			for _, connectionId in ipairs(passage.connections) do
-				if connectionId == chamber.id then
-					hasConnection = true
-					break
-				end
-			end
-			if hasConnection then break end
-		end
+		connectionGraph[chamber.id] = {}
+	end
 
-		if hasConnection then
-			table.insert(connected, chamber)
-		else
-			table.insert(isolated, chamber)
+	-- Map existing connections from passages
+	for _, passage in ipairs(caveData.passages) do
+		if passage.connections and #passage.connections >= 2 then
+			local id1, id2 = passage.connections[1], passage.connections[2]
+			if connectionGraph[id1] and connectionGraph[id2] then
+				table.insert(connectionGraph[id1], id2)
+				table.insert(connectionGraph[id2], id1)
+			end
 		end
 	end
 
-	-- Connect isolated chambers
-	for _, isolatedChamber in ipairs(isolated) do
-		if #connected > 0 then
-			local nearestConnected = connected[1]
-			local minDistance = Core.calculateDistance3D(isolatedChamber.position, nearestConnected.position)
+	-- Find connected components using flood fill
+	local visited = {}
+	local components = {}
 
-			for _, connectedChamber in ipairs(connected) do
-				local distance = Core.calculateDistance3D(isolatedChamber.position, connectedChamber.position)
-				if distance < minDistance then
-					minDistance = distance
-					nearestConnected = connectedChamber
+	local function floodFill(startId)
+		local component = {}
+		local queue = {startId}
+		visited[startId] = true
+
+		while #queue > 0 do
+			local currentId = table.remove(queue, 1)
+			table.insert(component, currentId)
+
+			for _, neighborId in ipairs(connectionGraph[currentId] or {}) do
+				if not visited[neighborId] then
+					visited[neighborId] = true
+					table.insert(queue, neighborId)
 				end
 			end
+		end
 
-			-- Create connecting passage
-			local path = Core.findPath(isolatedChamber.position, nearestConnected.position)
-			local passage: Passage = {
-				id = Core.generateId("bridge_passage"),
-				startPos = isolatedChamber.position,
-				endPos = nearestConnected.position,
-				path = path,
-				width = 4,
-				connections = {isolatedChamber.id, nearestConnected.id}
-			}
+		return component
+	end
 
-			Core.addPassage(passage)
-			table.insert(connected, isolatedChamber)
+	for _, chamber in ipairs(mainChambers) do
+		if not visited[chamber.id] then
+			local component = floodFill(chamber.id)
+			table.insert(components, component)
+		end
+	end
 
-			log("INFO", "Created bridge passage", {
-				from = isolatedChamber.id,
-				to = nearestConnected.id,
-				distance = string.format("%.1f", minDistance)
-			})
+	log("INFO", "Found connectivity components", {
+		totalChambers = #mainChambers,
+		components = #components
+	})
+
+	-- Connect isolated components to the largest component
+	if #components > 1 then
+		-- Find largest component
+		local largestComponent = components[1]
+		for _, component in ipairs(components) do
+			if #component > #largestComponent then
+				largestComponent = component
+			end
+		end
+
+		-- Connect other components to the largest one
+		for _, component in ipairs(components) do
+			if component ~= largestComponent then
+				-- Find closest chambers between components
+				local minDistance = math.huge
+				local bestConnection = nil
+
+				for _, isolatedId in ipairs(component) do
+					for _, connectedId in ipairs(largestComponent) do
+						local isolatedChamber = nil
+						local connectedChamber = nil
+
+						-- Find chamber objects
+						for _, chamber in ipairs(mainChambers) do
+							if chamber.id == isolatedId then
+								isolatedChamber = chamber
+							elseif chamber.id == connectedId then
+								connectedChamber = chamber
+							end
+						end
+
+						if isolatedChamber and connectedChamber then
+							local distance = Core.calculateDistance3D(isolatedChamber.position, connectedChamber.position)
+							if distance < minDistance then
+								minDistance = distance
+								bestConnection = {isolatedChamber, connectedChamber}
+							end
+						end
+					end
+				end
+
+				-- Create bridge passage
+				if bestConnection then
+					local chamber1, chamber2 = bestConnection[1], bestConnection[2]
+					local path = Core.findPath(chamber1.position, chamber2.position, 30) -- Limited pathfinding
+
+					local bridgePassage: Passage = {
+						id = Core.generateId("bridge_passage"),
+						startPos = chamber1.position,
+						endPos = chamber2.position,
+						path = path,
+						width = 6, -- Wider bridge passages
+						connections = {chamber1.id, chamber2.id}
+					}
+
+					-- Carve the bridge passage with optimized algorithm
+					for i, pos in ipairs(path) do
+						if i % 2 == 0 then -- Skip every other point for performance
+							local radius = bridgePassage.width / 2
+							
+							-- Simple cylindrical carving
+							for r = 0, radius, 2 do
+								for angle = 0, 2*math.pi, math.pi/3 do
+									local offset = Vector3.new(
+										math.cos(angle) * r,
+										0,
+										math.sin(angle) * r
+									)
+									
+									for h = -radius, radius, 2 do
+										local voxelPos = pos + offset + Vector3.new(0, h, 0)
+										Core.setVoxel(voxelPos, true, Enum.Material.Air)
+									end
+								end
+							end
+						end
+						
+						-- Yield periodically
+						if i % 5 == 0 then
+							task.wait()
+						end
+					end
+
+					Core.addPassage(bridgePassage)
+
+					-- Update connectivity graph
+					table.insert(connectionGraph[chamber1.id], chamber2.id)
+					table.insert(connectionGraph[chamber2.id], chamber1.id)
+
+					log("INFO", "Created bridge passage", {
+						from = chamber1.id,
+						to = chamber2.id,
+						distance = string.format("%.1f", minDistance),
+						pathPoints = #path
+					})
+				end
+			end
 		end
 	end
 
 	log("INFO", "Connectivity analysis complete", {
 		totalChambers = #mainChambers,
-		connected = #connected,
-		bridgesCreated = #isolated
+		originalComponents = #components,
+		bridgesCreated = math.max(0, #components - 1)
 	})
 end
 

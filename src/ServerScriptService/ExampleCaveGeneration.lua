@@ -17,14 +17,15 @@ local InitializeCaveGeneration = require(script.Parent.InitializeCaveGeneration)
 --                                    EXAMPLE FUNCTIONS
 -- ================================================================================================
 
--- Example 1: Simple Quick Cave
+-- Example 1: Simple Quick Cave with Medium Preset
 local function generateSimpleCave()
-    print("\n=== Example 1: Simple Quick Cave ===")
+    print("\n=== Example 1: Simple Quick Cave with Medium Preset ===")
     
     local position = Vector3.new(100, -25, 0) -- Offset from spawn
-    local size = Vector3.new(60, 30, 60) -- Moderate size
+    local size = Vector3.new(80, 40, 80) -- Optimized size for better caves
     
-    local result = InitializeCaveGeneration.generateQuickCave(position, size)
+    -- Use the new preset-based generation
+    local result = InitializeCaveGeneration.generateCaveWithPreset(position, size, "medium")
     
     if result.success then
         print("✅ Simple cave generated successfully!")
@@ -38,63 +39,29 @@ local function generateSimpleCave()
     return result
 end
 
--- Example 2: Custom Configuration Cave
+-- Example 2: Custom Configuration Cave with Large Preset
 local function generateCustomCave()
-    print("\n=== Example 2: Custom Configuration Cave ===")
+    print("\n=== Example 2: Custom Configuration Cave with Large Preset ===")
     
-    local region = Region3.new(Vector3.new(-50, -50, 100), Vector3.new(50, -10, 200))
+    local region = Region3.new(Vector3.new(-60, -60, 100), Vector3.new(60, -10, 220))
     
-    -- Custom configuration for a specific cave style
-    local customConfig = {
-        Core = {
-            seed = 12345, -- Fixed seed for reproducible results
-            logLevel = "INFO",
-            enablePerformanceLogging = true
-        },
-        Tier1 = {
-            mainChambers = {
-                enabled = true,
-                densityThreshold = 0.12, -- More chambers than default
-                minSize = 12,
-                maxSize = 28,
-                heightVariation = 0.6 -- More varied chamber heights
-            },
-            passages = {
-                enabled = true,
-                minWidth = 5,
-                maxWidth = 12,
-                curvature = 0.4 -- More curved passages
-            },
-            verticalShafts = {
-                enabled = true,
-                density = 0.1, -- More vertical connections
-                minHeight = 20,
-                maxHeight = 60
-            }
-        },
-        Tier2 = {
-            enabled = true,
-            branches = {
-                enabled = true,
-                probability = 0.35, -- More branching
-                deadEndChance = 0.25 -- Fewer dead ends
-            },
-            subChambers = {
-                enabled = true,
-                probability = 0.6, -- More sub-chambers
-                sizeRatio = 0.8 -- Larger sub-chambers
-            }
-        },
-        Tier3 = {
-            enabled = false -- Skip micro-features for this example
-        }
-    }
+    -- Use large preset as base and customize
+    local Config = require(game.ReplicatedStorage.CaveGen.Config)
+    local customConfig = Config.withPreset("large")
+    
+    -- Additional customizations
+    customConfig.Core.seed = 12345 -- Fixed seed for reproducible results
+    customConfig.Core.logLevel = "INFO"
+    customConfig.Tier1.mainChambers.densityThreshold = 0.07 -- Slightly more chambers
+    customConfig.Tier1.passages.minWidth = 6 -- Wider passages
+    customConfig.Tier2.enabled = true
+    customConfig.Tier3.enabled = false -- Skip micro-features for faster generation
     
     local options = {
         enableTier1 = true,
         enableTier2 = true,
         enableTier3 = false,
-        timeout = 90,
+        timeout = 45, -- Reduced timeout with optimizations
         progressCallback = function(progress, stage, details)
             print(string.format("📊 %.1f%% - %s: %s", progress * 100, stage, details or ""))
         end
@@ -324,6 +291,11 @@ end
 -- generateSimpleCave()
 -- generateCustomCave()
 -- generateAdvancedCave()
+
+-- Quick preset examples:
+-- InitializeCaveGeneration.generateCaveWithPreset(Vector3.new(0, -30, 0), Vector3.new(60, 30, 60), "small")
+-- InitializeCaveGeneration.generateCaveWithPreset(Vector3.new(0, -30, 0), Vector3.new(100, 50, 100), "medium")
+-- InitializeCaveGeneration.generateCaveWithPreset(Vector3.new(0, -30, 0), Vector3.new(150, 80, 150), "large")
 
 print("💡 Cave Generation Examples loaded!")
 print("💡 Call runExamples() to run all examples, or call individual functions:")
