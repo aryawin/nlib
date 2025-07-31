@@ -35,7 +35,7 @@ local function generateMainChambers(region, config)
 		"Z:", math.ceil((maxPoint.Z - minPoint.Z) / 12))
 
 	-- Sample points for potential chambers (optimized spacing)
-	local sampleStep = 18 -- studs between samples (increased for fewer samples)
+	local sampleStep = 12 -- studs between samples (reduced for better chamber coverage)
 	local chamberCount = 0
 
 	local sampleCount = 0
