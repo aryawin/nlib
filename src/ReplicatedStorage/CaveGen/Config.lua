@@ -16,7 +16,7 @@ Config.Core = {
 	seed = nil, -- nil = random seed, number = specific seed for reproducible generation
 	chunkSize = 256, -- Size of processing chunks (studs) - optimized for performance
 	maxGenerationTime = 30.0, -- Target max generation time in seconds
-	yieldInterval = 50, -- Yield every N voxels processed - more frequent for stability
+	yieldInterval = 1000, -- Yield every N voxels processed - optimized for performance
 
 	-- Terrain Settings
 	terrainResolution = 4, -- Terrain voxel resolution

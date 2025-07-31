@@ -49,8 +49,8 @@ local function generateMainChambers(region, config)
 			for z = minPoint.Z, maxPoint.Z, sampleStep do
 				sampleCount = sampleCount + 1
 				
-				-- Yield more frequently to prevent hanging
-				if sampleCount % 10 == 0 then
+				-- Yield less frequently to prevent hanging (optimized for performance)
+				if sampleCount % 100 == 0 then
 					task.wait()
 					print("🔍 Sampled", sampleCount, "/", totalExpectedSamples, "locations for chambers...")
 				end
@@ -136,8 +136,8 @@ local function generateMainChambers(region, config)
 							for cz = position.Z - radiusZ, position.Z + radiusZ, step do
 								voxelCount = voxelCount + 1
 								
-								-- Yield every 25 voxels to prevent hanging (more frequent)
-								if voxelCount % 25 == 0 then
+								-- Yield every 500 voxels to prevent hanging (optimized for performance)
+								if voxelCount % 500 == 0 then
 									task.wait()
 								end
 								
@@ -279,8 +279,8 @@ local function generatePassages(chambers, config)
 								end
 							end
 
-							-- Yield less frequently for performance
-							if i % 10 == 0 then
+							-- Yield less frequently for performance (optimized)
+							if i % 50 == 0 then
 								wait()
 							end
 						end

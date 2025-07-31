@@ -567,7 +567,15 @@ function InitializeCaveGeneration.generateQuickCave(position: Vector3, size: Vec
 	
 	-- Align region to terrain grid for WriteVoxels compatibility
 	local resolution = 4 -- Default terrain resolution
+	local originalSize = region.Size
 	region = region:ExpandToGrid(resolution)
+	local expandedSize = region.Size
+	
+	log("DEBUG", "Region size adjustment", {
+		original = string.format("%.1fx%.1fx%.1f", originalSize.X, originalSize.Y, originalSize.Z),
+		expanded = string.format("%.1fx%.1fx%.1f", expandedSize.X, expandedSize.Y, expandedSize.Z),
+		resolution = resolution
+	})
 	
 	-- Use default configuration optimized for quick generation
 	local quickConfig = {

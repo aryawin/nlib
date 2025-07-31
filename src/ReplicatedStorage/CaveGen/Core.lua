@@ -322,14 +322,17 @@ function Core.initializeTerrainBuffer(region: Region3): ()
 		voxelData[x] = table.create(voxelsY)
 		voxelMaterials[x] = table.create(voxelsY)
 		for y = 1, voxelsY do
-			voxelData[x][y] = table.create(voxelsZ, 1) -- 0 = air, 1 = solid (start with solid rock)
-			voxelMaterials[x][y] = table.create(voxelsZ, config.Core.materialRock)
+			voxelData[x][y] = table.create(voxelsZ, 0) -- 0 = air, 1 = solid (start with air for cave carving)
+			voxelMaterials[x][y] = table.create(voxelsZ, config.Core.materialAir)
 		end
 	end
 
 	log("INFO", "Terrain buffer initialized", {
 		voxels = voxelsX * voxelsY * voxelsZ,
-		resolution = resolution
+		resolution = resolution,
+		dimensions = string.format("%dx%dx%d", voxelsX, voxelsY, voxelsZ),
+		regionSize = string.format("%.1fx%.1fx%.1f", size.X, size.Y, size.Z),
+		startState = "air (0) for cave carving"
 	})
 end
 
@@ -344,6 +347,8 @@ function Core.setVoxel(position: Vector3, isAir: boolean, material: Enum.Materia
 		y >= 1 and y <= #voxelData[1] and 
 		z >= 1 and z <= #voxelData[1][1] then
 
+		-- Set occupancy: 0 = air, 1 = solid
+		-- For caves: we keep air (0) and only set solid rock (1) where needed for walls/floor
 		voxelData[x][y][z] = if isAir then 0 else 1
 		voxelMaterials[x][y][z] = material or (if isAir then config.Core.materialAir else config.Core.materialRock)
 	end
@@ -385,6 +390,28 @@ function Core.applyTerrainChanges(region: Region3): ()
 		if #voxelData[1][1] ~= expectedZ then
 			error(string.format("Z dimension mismatch: expected %d, got %d", expectedZ, #voxelData[1][1]))
 		end
+		
+		-- Count air vs solid voxels for debugging
+		local airCount = 0
+		local solidCount = 0
+		for x = 1, #voxelData do
+			for y = 1, #voxelData[x] do
+				for z = 1, #voxelData[x][y] do
+					if voxelData[x][y][z] == 0 then
+						airCount = airCount + 1
+					else
+						solidCount = solidCount + 1
+					end
+				end
+			end
+		end
+		
+		log("DEBUG", "WriteVoxels data summary", {
+			totalVoxels = airCount + solidCount,
+			airVoxels = airCount,
+			solidVoxels = solidCount,
+			airPercentage = string.format("%.1f%%", (airCount / (airCount + solidCount)) * 100)
+		})
 		
 		workspace.Terrain:WriteVoxels(
 			region,
@@ -468,8 +495,8 @@ end
 function Core.recordVoxelProcessed(): ()
 	performanceData.voxelsProcessed = performanceData.voxelsProcessed + 1
 
-	-- Check if we need to yield (using optimized interval)
-	local yieldInterval = config.Core.yieldInterval or 50
+	-- Check if we need to yield (optimized interval for better performance)
+	local yieldInterval = config.Core.yieldInterval or 1000
 	if performanceData.voxelsProcessed % yieldInterval == 0 then
 		task.wait()
 	end
