@@ -301,8 +301,8 @@ function Core.initializeTerrainBuffer(region: Region3): ()
 		voxelData[x] = table.create(voxelsY)
 		voxelMaterials[x] = table.create(voxelsY)
 		for y = 1, voxelsY do
-			voxelData[x][y] = table.create(voxelsZ, 0) -- 0 = air, 1 = solid
-			voxelMaterials[x][y] = table.create(voxelsZ, config.Core.materialAir)
+			voxelData[x][y] = table.create(voxelsZ, 1) -- 0 = air, 1 = solid (start with solid rock)
+			voxelMaterials[x][y] = table.create(voxelsZ, config.Core.materialRock)
 		end
 	end
 
