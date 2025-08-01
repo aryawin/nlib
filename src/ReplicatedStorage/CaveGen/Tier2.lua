@@ -246,55 +246,6 @@ local function generateBranches(passages, config)
 
 	return branches
 end
-							for h = -widthAtPoint/4, widthAtPoint/4, 1 do
-								local finalPos = pos + offset + Vector3.new(0, h, 0)
-
-								-- Wall roughness
-								local roughness = Core.getNoise3D(
-									finalPos.X * 0.25,
-									finalPos.Y * 0.25,
-									finalPos.Z * 0.25
-								) * 0.4
-
-								if r <= widthAtPoint/2 + roughness then
-									Core.setVoxel(finalPos, true, Enum.Material.Air)
-								end
-							end
-						end
-					end
-
-					if Core.recordVoxelProcessed then Core.recordVoxelProcessed() end
-				end
-
-				-- Seal dead end if needed
-				if isDeadEnd and config.Tier2.falsePassages.enabled then
-					local endPos = branchPath[#branchPath]
-					local sealLength = config.Tier2.falsePassages.taperLength
-
-					-- Create tapering seal
-					for s = 0, sealLength, 1 do
-						local sealPos = endPos + branchDir * s
-						local sealRadius = baseWidth/2 * (1 - s/sealLength)
-
-						for r = 0, sealRadius, 1 do
-							for angle = 0, 2*math.pi, math.pi/4 do
-								local offset = Vector3.new(
-									math.cos(angle) * r,
-									0,
-									math.sin(angle) * r
-								)
-								Core.setVoxel(sealPos + offset, false, config.Tier2.falsePassages.sealMaterial)
-							end
-						end
-					end
-				end
-			end
-		end
-	end
-
-	print("✅ Generated", branchCount, "branches")
-	return branches
-end
 
 -- ================================================================================================
 --                                    SUB-CHAMBERS
@@ -310,6 +261,12 @@ local function generateSubChambers(mainChambers, config)
 	local subChambers = {}
 	local subChamberConfig = config.Tier2.subChambers
 	local subChamberCount = 0
+
+	-- Validate input chambers
+	if not mainChambers or #mainChambers == 0 then
+		print("⚠️ No chambers available for sub-chamber generation")
+		return {}
+	end
 
 	for _, chamber in ipairs(mainChambers) do
 		if math.random() < subChamberConfig.probability then

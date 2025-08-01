@@ -224,7 +224,7 @@ end
 
 local function startPerformanceMonitoring(): number
 	local startTime = tick()
-	collectgarbage("collect") -- Clean up before starting
+	local _ = gcinfo() -- Clean up before starting (gcinfo triggers collection)
 	log("DEBUG", "Performance monitoring started")
 	return startTime
 end
@@ -233,7 +233,7 @@ local function endPerformanceMonitoring(startTime: number): {generationTime: num
 	local endTime = tick()
 	local generationTime = endTime - startTime
 	
-	local memoryAfter = collectgarbage("count")
+	local memoryAfter = gcinfo()
 	log("INFO", string.format("Generation completed in %.3f seconds", generationTime))
 	log("INFO", string.format("Memory usage: %.2f KB", memoryAfter))
 	
@@ -659,7 +659,7 @@ function InitializeCaveGeneration.cleanup(): ()
 	Core.clearCaveData()
 	
 	-- Force garbage collection
-	collectgarbage("collect")
+	local _ = gcinfo() -- gcinfo triggers garbage collection
 	
 	log("INFO", "Cave generation cleanup completed")
 end

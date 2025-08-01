@@ -494,7 +494,7 @@ function Core.initializeTerrainBuffer(region: Region3): ()
 		-- Clear existing buffers
 		voxelData = nil
 		voxelMaterials = nil
-		collectgarbage("collect")
+		local _ = gcinfo() -- gcinfo triggers garbage collection
 
 		-- Initialize 3D arrays with error handling
 		voxelData = {}

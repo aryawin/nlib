@@ -230,36 +230,6 @@ local function generateFractureVeins(region, config)
 
 	return fractureVeins
 end
-					}
-
-					table.insert(fractureVeins, vein)
-					Core.addFeature({
-						id = vein.id,
-						type = "fracture_vein",
-						position = startPos,
-						properties = vein
-					})
-					veinCount = veinCount + 1
-
-					-- Carve the vein (NOW USES STORED PERPENDICULAR)
-					for _, pos in ipairs(veinPath) do
-						-- Create thin crack
-						for w = -veinConfig.width/2, veinConfig.width/2, 0.5 do
-							for h = -veinConfig.width, veinConfig.width, 0.5 do
-								local offset = vein.perpendicular * w + Vector3.new(0, h, 0)
-								Core.setVoxel(pos + offset, true, Enum.Material.Air)
-							end
-						end
-						if Core.recordVoxelProcessed then Core.recordVoxelProcessed() end
-					end
-				end
-			end
-		end
-	end
-
-	print("✅ Generated", veinCount, "fracture veins")
-	return fractureVeins
-end
 
 -- ================================================================================================
 --                                    PINCH POINTS
