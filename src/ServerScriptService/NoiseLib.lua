@@ -1423,7 +1423,7 @@ function NoiseGenerator:generateNoiseLayers(x: number, y: number, z: number, lay
 	assert(type(layerConfigs) == "table", "Layer configs must be a table")
 	
 	return self:profileFunction("generateNoiseLayers", function(): {[string]: number}
-		local results = {}
+		local results: {[string]: number} = {}
 		
 		for layerName, config in pairs(layerConfigs) do
 			local noiseType = config.type or "simplex3D"
@@ -2033,10 +2033,10 @@ function NoiseGenerator:generateCompleteUnderground(region: Region3, settings: U
 		callback(0.9, "Step 4: Natural Entrances", "Finding surface connections...")
 		print("🚪 Step 4: Finding natural entrances...")
 		local heightmap: {{number}} = self:generateHeightmap(
-			math.floor(region.Size.X / 4),
-			math.floor(region.Size.Z / 4),
-			validateNoiseSettings(settings.surface)
-		)
+				math.floor(region.Size.X / 4),
+				math.floor(region.Size.Z / 4),
+				validateNoiseSettings(settings.surface)
+			)
 		local entrances: {CaveEntrance} = self:generateCaveEntrances(heightmap, caves.caves)
 
 		local stats = {

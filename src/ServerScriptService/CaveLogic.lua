@@ -188,9 +188,14 @@ function CaveLogic.simulateErosion(
 		}
 	end
 	
+	-- Initialize erosion values
+	local waterErosion = 0
+	local chemicalErosion = 0
+	local mechanicalErosion = 0
+	
 	-- Water erosion (mechanical)
 	if config.geology.waterErosionStrength > 0 then
-		local waterErosion = EROSION_CONSTANTS.WATER_EROSION_RATE 
+		waterErosion = EROSION_CONSTANTS.WATER_EROSION_RATE 
 			* velocity 
 			* config.geology.waterErosionStrength
 			* (1 - geologicalLayer.hardness)
@@ -202,7 +207,7 @@ function CaveLogic.simulateErosion(
 	
 	-- Chemical erosion (dissolution)
 	if config.geology.chemicalErosion > 0 and geologicalLayer.solubility > 0.1 then
-		local chemicalErosion = EROSION_CONSTANTS.CHEMICAL_EROSION_RATE
+		chemicalErosion = EROSION_CONSTANTS.CHEMICAL_EROSION_RATE
 			* geologicalLayer.solubility
 			* config.geology.chemicalErosion
 			* math.min(velocity, 1.0) -- Chemical erosion less dependent on velocity
@@ -216,7 +221,7 @@ function CaveLogic.simulateErosion(
 	
 	-- Mechanical erosion (abrasion)
 	if config.geology.mechanicalErosion > 0 and velocity > 0.5 then
-		local mechanicalErosion = EROSION_CONSTANTS.MECHANICAL_EROSION_RATE
+		mechanicalErosion = EROSION_CONSTANTS.MECHANICAL_EROSION_RATE
 			* (velocity - 0.5) -- Only at higher velocities
 			* config.geology.mechanicalErosion
 			* geologicalLayer.jointDensity -- More effective on jointed rock
