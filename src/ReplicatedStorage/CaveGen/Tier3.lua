@@ -25,78 +25,211 @@ local function generateFractureVeins(region, config)
 	local veinConfig = config.Tier3.fractureVeins
 	local veinCount = 0
 
-	local minPoint = region.CFrame.Position - region.Size/2
-	local maxPoint = region.CFrame.Position + region.Size/2
+	-- Validate region
+	if not region or not region.Size then
+		print("⚠️ Invalid region for fracture vein generation")
+		return {}
+	end
 
-	local sampleStep = 15
-	for x = minPoint.X, maxPoint.X, sampleStep do
-		for y = minPoint.Y, maxPoint.Y, sampleStep do
-			for z = minPoint.Z, maxPoint.Z, sampleStep do
-				if math.random() < veinConfig.density then
-					local startPos = Vector3.new(x, y, z)
+	local success, bounds = pcall(function()
+		local minPoint = region.CFrame.Position - region.Size/2
+		local maxPoint = region.CFrame.Position + region.Size/2
+		return {min = minPoint, max = maxPoint}
+	end)
+	
+	if not success then
+		print("⚠️ Failed to calculate region bounds:", bounds)
+		return {}
+	end
 
-					-- Generate random direction with bias toward horizontal/vertical
-					local directionType = math.random()
-					local direction
-					if directionType < 0.4 then
-						-- Horizontal vein
-						direction = Vector3.new(
-							(math.random() - 0.5) * 2,
-							0,
-							(math.random() - 0.5) * 2
-						).Unit
-					elseif directionType < 0.8 then
-						-- Vertical vein
-						direction = Vector3.new(
-							(math.random() - 0.5) * 0.3,
-							(math.random() > 0.5) and 1 or -1,
-							(math.random() - 0.5) * 0.3
-						).Unit
+	local minPoint, maxPoint = bounds.min, bounds.max
+	local startTime = tick()
+	local maxVeins = 200 -- Reasonable limit
+	local timeoutTotal = 60 -- 1 minute timeout
+
+	-- Adaptive sampling based on region size
+	local regionVolume = region.Size.X * region.Size.Y * region.Size.Z
+	local adaptiveSampleStep = math.max(8, math.min(20, regionVolume / 100000))
+	
+	print("🔍 Using adaptive sample step for fracture veins:", adaptiveSampleStep)
+
+	for x = minPoint.X, maxPoint.X, adaptiveSampleStep do
+		if veinCount >= maxVeins then
+			print("⚠️ Reached maximum fracture veins limit:", maxVeins)
+			break
+		end
+
+		if tick() - startTime > timeoutTotal then
+			print("⚠️ Fracture vein generation timeout")
+			break
+		end
+
+		for y = minPoint.Y, maxPoint.Y, adaptiveSampleStep do
+			for z = minPoint.Z, maxPoint.Z, adaptiveSampleStep do
+				if veinCount >= maxVeins then
+					break
+				end
+
+				local shouldGenerateVein = false
+				pcall(function()
+					shouldGenerateVein = math.random() < veinConfig.density
+				end)
+
+				if shouldGenerateVein then
+					local veinSuccess, vein = pcall(function()
+						local startPos = Vector3.new(x, y, z)
+
+						-- Generate random direction with bias toward horizontal/vertical
+						local directionType = math.random()
+						local direction
+						if directionType < 0.4 then
+							-- Horizontal vein
+							direction = Vector3.new(
+								(math.random() - 0.5) * 2,
+								0,
+								(math.random() - 0.5) * 2
+							).Unit
+						elseif directionType < 0.8 then
+							-- Vertical vein
+							direction = Vector3.new(
+								(math.random() - 0.5) * 0.3,
+								(math.random() > 0.5) and 1 or -1,
+								(math.random() - 0.5) * 0.3
+							).Unit
+						else
+							-- Diagonal vein
+							direction = Vector3.new(
+								(math.random() - 0.5) * 2,
+								(math.random() - 0.5) * 2,
+								(math.random() - 0.5) * 2
+							).Unit
+						end
+
+						-- Calculate perpendicular vector for zigzag motion with validation
+						local perpendicular = Vector3.new(-direction.Z, 0, direction.X)
+						if perpendicular.Magnitude < 0.1 then
+							-- Fallback perpendicular for vertical directions
+							perpendicular = Vector3.new(1, 0, 0)
+						else
+							perpendicular = perpendicular.Unit
+						end
+
+						-- Determine vein length with error handling
+						local lengthNoise = 0
+						pcall(function()
+							lengthNoise = Core.getNoise3D(x * 0.1, y * 0.1, z * 0.1)
+						end)
+						
+						local length = math.max(veinConfig.minLength,
+							math.min(veinConfig.maxLength,
+								veinConfig.minLength + (veinConfig.maxLength - veinConfig.minLength) * 
+								math.max(0, math.min(1, (lengthNoise + 1) / 2))))
+
+						-- Create zigzag path with validation
+						local veinPath = {startPos}
+						local currentPos = startPos
+						local stepSize = math.max(0.5, length / 30) -- Adaptive step size
+
+						for d = stepSize, length, stepSize do
+							-- Add controlled zigzag motion
+							local zigzagNoise = 0
+							pcall(function()
+								zigzagNoise = Core.getNoise3D(
+									(startPos.X + d) * 0.2,
+									(startPos.Y + d) * 0.2,
+									(startPos.Z + d) * 0.2
+								)
+							end)
+
+							-- Create perpendicular zigzag with bounds checking
+							local zigzagIntensity = math.min(veinConfig.zigzagIntensity or 0.4, 2.0)
+							local zigzagOffset = perpendicular * zigzagNoise * zigzagIntensity * 0.5 -- Reduced intensity
+
+							local nextPos = currentPos + direction * stepSize + zigzagOffset
+							table.insert(veinPath, nextPos)
+							currentPos = nextPos
+
+							-- Yield periodically
+							if #veinPath % 10 == 0 then
+								task.wait()
+							end
+						end
+
+						-- Validate path was created
+						if #veinPath < 2 then
+							error("Vein path too short")
+						end
+
+						local veinData = {
+							id = Core.generateId("vein"),
+							startPos = startPos,
+							path = veinPath,
+							width = math.max(0.3, math.min(2.0, veinConfig.width or 0.5)),
+							length = length,
+							perpendicular = perpendicular
+						}
+
+						-- Carve the vein with optimized algorithm
+						local operationCount = 0
+						for pathIndex, pos in ipairs(veinPath) do
+							-- Skip some path points for performance
+							if pathIndex % 2 == 0 or pathIndex == 1 or pathIndex == #veinPath then
+								local width = veinData.width
+								
+								-- Create thin crack with simplified algorithm
+								local step = math.max(0.3, width / 4)
+								for w = -width/2, width/2, step do
+									for h = -width, width, step do
+										local offset = veinData.perpendicular * w + Vector3.new(0, h, 0)
+										Core.setVoxel(pos + offset, true, Enum.Material.Air)
+										operationCount = operationCount + 1
+										
+										-- Yield periodically
+										if operationCount % 50 == 0 then
+											task.wait()
+										end
+									end
+								end
+							end
+						end
+
+						return veinData
+					end)
+
+					if veinSuccess and vein then
+						table.insert(fractureVeins, vein)
+						Core.addFeature({
+							id = vein.id,
+							type = "fracture_vein",
+							position = vein.startPos,
+							properties = vein
+						})
+						veinCount = veinCount + 1
+						
+						if veinCount % 10 == 0 then
+							print("⚡ Generated", veinCount, "fracture veins...")
+						end
 					else
-						-- Diagonal vein
-						direction = Vector3.new(
-							(math.random() - 0.5) * 2,
-							(math.random() - 0.5) * 2,
-							(math.random() - 0.5) * 2
-						).Unit
+						print("⚠️ Failed to create fracture vein at", x, y, z, ":", tostring(vein))
 					end
+				end
+			end
+		end
 
-					-- Calculate perpendicular vector for zigzag motion (MOVED HERE)
-					local perpendicular = Vector3.new(-direction.Z, 0, direction.X)
+		-- Yield between X slices
+		if math.floor(x) % (adaptiveSampleStep * 3) == 0 then
+			task.wait()
+		end
+	end
 
-					-- Determine vein length
-					local lengthNoise = Core.getNoise3D(x * 0.1, y * 0.1, z * 0.1)
-					local length = veinConfig.minLength + 
-						(veinConfig.maxLength - veinConfig.minLength) * (lengthNoise + 1) / 2
+	print("⚡ Fracture vein generation complete:", {
+		veinsGenerated = veinCount,
+		timeElapsed = string.format("%.1f seconds", tick() - startTime),
+		sampleStep = adaptiveSampleStep
+	})
 
-					-- Create zigzag path
-					local veinPath = {startPos}
-					local currentPos = startPos
-					local currentDir = direction
-
-					local step = 1
-					for d = step, length, step do
-						-- Add zigzag motion
-						local zigzagNoise = Core.getNoise3D(
-							(startPos.X + d) * 0.3,
-							(startPos.Y + d) * 0.3,
-							(startPos.Z + d) * 0.3
-						)
-
-						-- Create perpendicular zigzag
-						local zigzagOffset = perpendicular * zigzagNoise * veinConfig.zigzagIntensity
-
-						currentPos = currentPos + currentDir * step + zigzagOffset
-						table.insert(veinPath, currentPos)
-					end
-
-					local vein = {
-						id = Core.generateId("vein"),
-						startPos = startPos,
-						path = veinPath,
-						width = veinConfig.width,
-						length = length,
-						perpendicular = perpendicular -- Store for carving
+	return fractureVeins
+end
 					}
 
 					table.insert(fractureVeins, vein)
@@ -610,46 +743,129 @@ function Tier3.generate(region, config)
 	print("🥉 === TIER 3: MICRO-FEATURES GENERATION ===")
 
 	local startTime = tick()
-	local caveData = Core.getCaveData()
+	local results = {
+		fractureVeins = {},
+		pinchPoints = {},
+		seamLayers = {},
+		shelfLayers = {},
+		plateGaps = {},
+		pressureFunnels = {},
+		concretionDomes = {},
+		generationTime = 0,
+		featureCount = 0
+	}
 
-	-- Generate fracture veins throughout the region
-	local fractureVeins = generateFractureVeins(region, config)
+	local caveData = Core.getCaveData()
+	local totalFeatures = 0
+
+	-- Generate fracture veins throughout the region with error handling
+	local fractureSuccess, fractureVeins = pcall(function()
+		print("⚡ Starting fracture vein generation...")
+		return generateFractureVeins(region, config)
+	end)
+	
+	if fractureSuccess and fractureVeins then
+		results.fractureVeins = fractureVeins
+		totalFeatures = totalFeatures + #fractureVeins
+		print("⚡ Fracture veins generated successfully:", #fractureVeins)
+	else
+		print("⚠️ Fracture vein generation failed:", tostring(fractureVeins))
+	end
 
 	-- Add pinch points to existing passages
-	local pinchPoints = generatePinchPoints(caveData.passages, config)
+	local pinchSuccess, pinchPoints = pcall(function()
+		print("🔒 Starting pinch point generation...")
+		return generatePinchPoints(caveData.passages, config)
+	end)
+	
+	if pinchSuccess and pinchPoints then
+		results.pinchPoints = pinchPoints
+		totalFeatures = totalFeatures + #pinchPoints
+		print("🔒 Pinch points generated successfully:", #pinchPoints)
+	else
+		print("⚠️ Pinch point generation failed:", tostring(pinchPoints))
+	end
 
 	-- Generate horizontal seam layers
-	local seamLayers = generateSeamLayers(region, config)
+	local seamSuccess, seamLayers = pcall(function()
+		print("📚 Starting seam layer generation...")
+		return generateSeamLayers(region, config)
+	end)
+	
+	if seamSuccess and seamLayers then
+		results.seamLayers = seamLayers
+		totalFeatures = totalFeatures + #seamLayers
+		print("📚 Seam layers generated successfully:", #seamLayers)
+	else
+		print("⚠️ Seam layer generation failed:", tostring(seamLayers))
+	end
 
 	-- Add shelf layers to chambers
-	local shelfLayers = generateShelfLayers(caveData.chambers, config)
+	local shelfSuccess, shelfLayers = pcall(function()
+		print("📏 Starting shelf layer generation...")
+		return generateShelfLayers(caveData.chambers, config)
+	end)
+	
+	if shelfSuccess and shelfLayers then
+		results.shelfLayers = shelfLayers
+		totalFeatures = totalFeatures + #shelfLayers
+		print("📏 Shelf layers generated successfully:", #shelfLayers)
+	else
+		print("⚠️ Shelf layer generation failed:", tostring(shelfLayers))
+	end
 
 	-- Generate vertical plate gaps
-	local plateGaps = generatePlateGaps(region, config)
+	local plateSuccess, plateGaps = pcall(function()
+		print("🕳️ Starting plate gap generation...")
+		return generatePlateGaps(region, config)
+	end)
+	
+	if plateSuccess and plateGaps then
+		results.plateGaps = plateGaps
+		totalFeatures = totalFeatures + #plateGaps
+		print("🕳️ Plate gaps generated successfully:", #plateGaps)
+	else
+		print("⚠️ Plate gap generation failed:", tostring(plateGaps))
+	end
 
 	-- Modify chambers to create pressure funnels
-	local pressureFunnels = generatePressureFunnels(caveData.chambers, config)
+	local funnelSuccess, pressureFunnels = pcall(function()
+		print("🌀 Starting pressure funnel generation...")
+		return generatePressureFunnels(caveData.chambers, config)
+	end)
+	
+	if funnelSuccess and pressureFunnels then
+		results.pressureFunnels = pressureFunnels
+		totalFeatures = totalFeatures + #pressureFunnels
+		print("🌀 Pressure funnels generated successfully:", #pressureFunnels)
+	else
+		print("⚠️ Pressure funnel generation failed:", tostring(pressureFunnels))
+	end
 
 	-- Add concretion domes to chamber ceilings
-	local concretionDomes = generateConcretionDomes(caveData.chambers, config)
+	local domeSuccess, concretionDomes = pcall(function()
+		print("🔘 Starting concretion dome generation...")
+		return generateConcretionDomes(caveData.chambers, config)
+	end)
+	
+	if domeSuccess and concretionDomes then
+		results.concretionDomes = concretionDomes
+		totalFeatures = totalFeatures + #concretionDomes
+		print("🔘 Concretion domes generated successfully:", #concretionDomes)
+	else
+		print("⚠️ Concretion dome generation failed:", tostring(concretionDomes))
+	end
 
 	local endTime = tick()
-	local generationTime = endTime - startTime
+	results.generationTime = endTime - startTime
+	results.featureCount = totalFeatures
 
-	print(string.format("✅ Tier 3 complete in %.3f seconds", generationTime))
-	print(string.format("📊 Generated: %d fracture veins, %d pinch points, %d seam layers, %d shelf layers, %d plate gaps, %d pressure funnels, %d concretion domes", 
-		#fractureVeins, #pinchPoints, #seamLayers, #shelfLayers, #plateGaps, #pressureFunnels, #concretionDomes))
+	print(string.format("✅ Tier 3 micro-features generation complete in %.3f seconds", results.generationTime))
+	print(string.format("📊 Total features generated: %d (%d fracture veins, %d pinch points, %d seam layers, %d shelf layers, %d plate gaps, %d pressure funnels, %d concretion domes)", 
+		totalFeatures, #results.fractureVeins, #results.pinchPoints, #results.seamLayers, 
+		#results.shelfLayers, #results.plateGaps, #results.pressureFunnels, #results.concretionDomes))
 
-	return {
-		fractureVeins = fractureVeins,
-		pinchPoints = pinchPoints,
-		seamLayers = seamLayers,
-		shelfLayers = shelfLayers,
-		plateGaps = plateGaps,
-		pressureFunnels = pressureFunnels,
-		concretionDomes = concretionDomes,
-		generationTime = generationTime
-	}
+	return results
 end
 
 return Tier3

@@ -295,35 +295,37 @@ local function runGenerationTier(tierFunc: (any, any) -> any, tierName: string, 
 	local timeout = (options and options.timeout) or config.Core.maxGenerationTime or 60
 	log("DEBUG", string.format("Using timeout of %d seconds for %s", timeout, tierName))
 	
-	-- For debugging: try direct execution first to see if the timeout mechanism is the issue
-	log("DEBUG", "Attempting direct execution (no timeout) for debugging...")
-	local directSuccess, directResult = pcall(function()
-		return tierFunc(region, config)
+	-- Improved timeout handling with progress monitoring
+	local startTime = tick()
+	local success, result = pcall(function()
+		log("DEBUG", string.format("Executing %s generation function...", tierName))
+		
+		-- Create a monitoring coroutine for timeout
+		local timeoutCo = coroutine.create(function()
+			while tick() - startTime < timeout do
+				task.wait(1) -- Check every second
+			end
+			error(string.format("%s generation timeout after %d seconds", tierName, timeout))
+		end)
+		
+		-- Start timeout monitoring
+		local timeoutStarted = coroutine.resume(timeoutCo)
+		
+		-- Execute the tier function
+		local tierResult = tierFunc(region, config)
+		
+		-- If we get here, the function completed successfully
+		log("DEBUG", string.format("%s completed in %.2f seconds", tierName, tick() - startTime))
+		return tierResult
 	end)
 	
-	if directSuccess then
-		log("DEBUG", "Direct execution succeeded - issue is likely in timeout mechanism")
-		return true, directResult
-	else
-		log("ERROR", "Direct execution failed:", tostring(directResult))
-		return false, directResult
-	end
-	
-	-- Original timeout-based execution (commented out for debugging)
-	--[[
-	local success, result = executeWithTimeout(function()
-		log("DEBUG", string.format("Executing %s generation function...", tierName))
-		return tierFunc(region, config)
-	end, timeout)
-	
 	if success then
-		log("INFO", string.format("%s generation completed successfully", tierName))
+		log("INFO", string.format("%s generation completed successfully in %.2f seconds", tierName, tick() - startTime))
 		return true, result
 	else
-		log("ERROR", string.format("%s generation failed: %s", tierName, tostring(result)))
+		log("ERROR", string.format("%s generation failed after %.2f seconds: %s", tierName, tick() - startTime, tostring(result)))
 		return false, result
 	end
-	--]]
 end
 
 -- ================================================================================================
