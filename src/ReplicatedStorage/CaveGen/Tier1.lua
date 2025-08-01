@@ -25,39 +25,80 @@ local function generateMainChambers(region, config)
 	local chamberConfig = config.Tier1.mainChambers
 	local noiseConfig = config.Noise.chambers
 
-	-- Calculate region bounds
-	local minPoint = region.CFrame.Position - region.Size/2
-	local maxPoint = region.CFrame.Position + region.Size/2
+	-- Calculate region bounds with validation
+	local success, bounds = pcall(function()
+		local minPoint = region.CFrame.Position - region.Size/2
+		local maxPoint = region.CFrame.Position + region.Size/2
+		
+		-- Validate bounds
+		if minPoint.X >= maxPoint.X or minPoint.Y >= maxPoint.Y or minPoint.Z >= maxPoint.Z then
+			error("Invalid region bounds")
+		end
+		
+		return {min = minPoint, max = maxPoint}
+	end)
+	
+	if not success then
+		print("⚠️ Failed to calculate region bounds:", bounds)
+		return {}
+	end
+	
+	local minPoint, maxPoint = bounds.min, bounds.max
 	
 	print("🔍 Region bounds - Min:", minPoint, "Max:", maxPoint)
-	print("🔍 Expected iterations - X:", math.ceil((maxPoint.X - minPoint.X) / 12), 
-		"Y:", math.ceil((maxPoint.Y - minPoint.Y) / 12), 
-		"Z:", math.ceil((maxPoint.Z - minPoint.Z) / 12))
 
-	-- Sample points for potential chambers (optimized spacing)
-	local sampleStep = 18 -- studs between samples (increased for fewer samples)
+	-- Optimized sampling with adaptive step size based on region size
+	local regionVolume = region.Size.X * region.Size.Y * region.Size.Z
+	local adaptiveSampleStep = math.max(12, math.min(24, regionVolume / 50000)) -- Adaptive based on volume
+	
+	print("🔍 Using adaptive sample step:", adaptiveSampleStep)
+
 	local chamberCount = 0
-
 	local sampleCount = 0
-	local totalExpectedSamples = math.ceil((maxPoint.X - minPoint.X) / sampleStep) * 
-								math.ceil((maxPoint.Y - minPoint.Y) / sampleStep) * 
-								math.ceil((maxPoint.Z - minPoint.Z) / sampleStep)
+	local failedSamples = 0
+	
+	-- Calculate expected samples for progress tracking
+	local totalExpectedSamples = math.ceil((maxPoint.X - minPoint.X) / adaptiveSampleStep) * 
+								math.ceil((maxPoint.Y - minPoint.Y) / adaptiveSampleStep) * 
+								math.ceil((maxPoint.Z - minPoint.Z) / adaptiveSampleStep)
 	print("🔍 Total expected samples:", totalExpectedSamples)
 	
-	for x = minPoint.X, maxPoint.X, sampleStep do
-		for y = minPoint.Y, maxPoint.Y, sampleStep do
-			for z = minPoint.Z, maxPoint.Z, sampleStep do
+	-- Add early termination for excessive sample counts
+	if totalExpectedSamples > 10000 then
+		print("⚠️ Sample count too high, increasing step size")
+		adaptiveSampleStep = adaptiveSampleStep * 1.5
+		totalExpectedSamples = math.ceil((maxPoint.X - minPoint.X) / adaptiveSampleStep) * 
+							 math.ceil((maxPoint.Y - minPoint.Y) / adaptiveSampleStep) * 
+							 math.ceil((maxPoint.Z - minPoint.Z) / adaptiveSampleStep)
+		print("🔍 Adjusted samples:", totalExpectedSamples)
+	end
+	
+	for x = minPoint.X, maxPoint.X, adaptiveSampleStep do
+		for y = minPoint.Y, maxPoint.Y, adaptiveSampleStep do
+			for z = minPoint.Z, maxPoint.Z, adaptiveSampleStep do
 				sampleCount = sampleCount + 1
 				
-				-- Yield more frequently to prevent hanging
-				if sampleCount % 10 == 0 then
+				-- More frequent yielding for stability
+				if sampleCount % 5 == 0 then
 					task.wait()
-					print("🔍 Sampled", sampleCount, "/", totalExpectedSamples, "locations for chambers...")
 				end
 				
-				-- Use Worley noise to identify chamber locations
-				local success, chamberNoise = pcall(function()
-					return Core.getNoise3D(
+				-- Progress reporting every 25 samples
+				if sampleCount % 25 == 0 then
+					print("🔍 Chamber sampling progress:", string.format("%.1f%% (%d/%d)", 
+						(sampleCount / totalExpectedSamples) * 100, sampleCount, totalExpectedSamples))
+				end
+				
+				-- Early termination if too many chambers already
+				if chamberCount >= 50 then
+					print("🔍 Chamber limit reached, stopping sampling")
+					break
+				end
+				
+				-- Use Worley noise to identify chamber locations with error handling
+				local chamberNoise = 0
+				local noiseSuccess = pcall(function()
+					chamberNoise = Core.getNoise3D(
 						x * noiseConfig.scale,
 						y * noiseConfig.scale,
 						z * noiseConfig.scale,
@@ -65,39 +106,119 @@ local function generateMainChambers(region, config)
 					)
 				end)
 				
-				if not success then
-					print("⚠️ Failed to get noise at position", x, y, z, ":", chamberNoise)
-					continue
+				if not noiseSuccess then
+					failedSamples = failedSamples + 1
+					-- Use fallback noise calculation
+					chamberNoise = (math.sin(x * 0.1) + math.cos(y * 0.1) + math.sin(z * 0.1)) / 3
+					if failedSamples % 10 == 0 then
+						print("⚠️ Using fallback noise, failed samples:", failedSamples)
+					end
 				end
 
 				-- Chamber appears where Worley noise is low (cell centers)
 				if chamberNoise < chamberConfig.densityThreshold then
-					local position = Vector3.new(x, y, z)
+					local chamberSuccess, chamber = pcall(function()
+						local position = Vector3.new(x, y, z)
 
-					-- Determine chamber size with variation
-					local success2, sizeNoise = pcall(function()
-						return Core.getNoise3D(x * 0.05, y * 0.05, z * 0.05)
+						-- Determine chamber size with variation and error handling
+						local sizeNoise = 0
+						pcall(function()
+							sizeNoise = Core.getNoise3D(x * 0.05, y * 0.05, z * 0.05)
+						end)
+						
+						local baseSize = chamberConfig.minSize + 
+							(chamberConfig.maxSize - chamberConfig.minSize) * math.max(0, math.min(1, (sizeNoise + 1) / 2))
+
+						-- Apply asymmetry with error handling and bounds checking
+						local asymmetryX, asymmetryY, asymmetryZ = 1, 1, 1
+						pcall(function()
+							asymmetryX = math.max(0.5, math.min(2.0, 1 + (Core.getNoise3D(x * 0.1, y, z) * chamberConfig.asymmetryFactor)))
+							asymmetryY = math.max(0.5, math.min(2.0, 1 + (Core.getNoise3D(x, y * 0.1, z) * chamberConfig.heightVariation)))
+							asymmetryZ = math.max(0.5, math.min(2.0, 1 + (Core.getNoise3D(x, y, z * 0.1) * chamberConfig.asymmetryFactor)))
+						end)
+
+						local size = Vector3.new(
+							baseSize * asymmetryX,
+							baseSize * asymmetryY,
+							baseSize * asymmetryZ
+						)
+						
+						-- Validate chamber size
+						if size.X < chamberConfig.minSize or size.Y < chamberConfig.minSize or size.Z < chamberConfig.minSize then
+							error("Chamber too small")
+						end
+						if size.X > chamberConfig.maxSize * 2 or size.Y > chamberConfig.maxSize * 2 or size.Z > chamberConfig.maxSize * 2 then
+							error("Chamber too large")
+						end
+
+						return {
+							id = Core.generateId("chamber"),
+							position = position,
+							size = size,
+							shape = "ellipsoid",
+							connections = {},
+							material = Enum.Material.Air,
+							isMainChamber = true
+						}
 					end)
 					
-					if not success2 then
-						print("⚠️ Failed to get size noise:", sizeNoise)
-						continue
+					if chamberSuccess and chamber then
+						table.insert(chambers, chamber)
+						Core.addChamber(chamber)
+						chamberCount = chamberCount + 1
+						
+						-- Carve the chamber with error handling
+						local carveSuccess = pcall(function()
+							local chamberPos = chamber.position
+							local chamberSize = chamber.size
+							
+							-- Optimized ellipsoid carving with better yielding
+							local sampleStep = 2
+							local operationCount = 0
+							
+							for dx = -chamberSize.X/2, chamberSize.X/2, sampleStep do
+								for dy = -chamberSize.Y/2, chamberSize.Y/2, sampleStep do
+									for dz = -chamberSize.Z/2, chamberSize.Z/2, sampleStep do
+										-- Ellipsoid equation with bounds checking
+										local normalizedX = dx / (chamberSize.X/2)
+										local normalizedY = dy / (chamberSize.Y/2)
+										local normalizedZ = dz / (chamberSize.Z/2)
+										
+										if normalizedX*normalizedX + normalizedY*normalizedY + normalizedZ*normalizedZ <= 1 then
+											local voxelPos = chamberPos + Vector3.new(dx, dy, dz)
+											Core.setVoxel(voxelPos, true, Enum.Material.Air)
+											operationCount = operationCount + 1
+											
+											-- Yield more frequently during carving
+											if operationCount % 100 == 0 then
+												task.wait()
+											end
+										end
+									end
+								end
+							end
+						end)
+						
+						if not carveSuccess then
+							print("⚠️ Failed to carve chamber at", chamber.position)
+						end
+						
+						print("🏛️ Created chamber", chamberCount, "at", chamber.position, "size", chamber.size)
 					end
-					
-					local baseSize = chamberConfig.minSize + 
-						(chamberConfig.maxSize - chamberConfig.minSize) * (sizeNoise + 1) / 2
+				end
+			end
+		end
+	end
 
-					-- Apply asymmetry with error handling
-					local asymmetryX, asymmetryY, asymmetryZ = 1, 1, 1
-					pcall(function()
-						asymmetryX = 1 + (Core.getNoise3D(x * 0.1, y, z) * chamberConfig.asymmetryFactor)
-						asymmetryY = 1 + (Core.getNoise3D(x, y * 0.1, z) * chamberConfig.heightVariation)
-						asymmetryZ = 1 + (Core.getNoise3D(x, y, z * 0.1) * chamberConfig.asymmetryFactor)
-					end)
+	print("🏛️ Main chamber generation complete:", {
+		chambersGenerated = chamberCount,
+		samplesProcessed = sampleCount,
+		failedSamples = failedSamples,
+		successRate = string.format("%.1f%%", (sampleCount - failedSamples) / sampleCount * 100)
+	})
 
-					local size = Vector3.new(
-						baseSize * asymmetryX,
-						baseSize * asymmetryY,
+	return chambers
+end
 						baseSize * asymmetryZ
 					)
 
